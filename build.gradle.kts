@@ -2,8 +2,9 @@ plugins {
     id("java")
     id("application")
     `maven-publish`
-
+    signing
 }
+
 
 publishing {
     repositories {
@@ -24,7 +25,7 @@ publishing {
 }
 
 group = "com.sankhya.ce"
-version = "1.0-snapshot"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -50,8 +51,8 @@ java {
 
 tasks {
     jar {
-        archiveBaseName.set("UtilsSNK")
-        archiveVersion.set("1.0-snapshot")
+        archiveBaseName.set("utils-snk")
+        archiveVersion.set("1.0.0")
         dependencies {
             implementation(fileTree("libs"))
         }
