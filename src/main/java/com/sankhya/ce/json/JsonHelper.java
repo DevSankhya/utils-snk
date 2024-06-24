@@ -27,62 +27,6 @@ public class JsonHelper {
         return new JsonHelper(json);
     }
 
-    public JSONProp getProp(String name) {
-        JSONObject jsonObject;
-        if (name.trim().isEmpty()) {
-            return new JSONProp(json);
-        }
-        String[] props = name.trim().split("\\.");
-        if (json instanceof String) {
-            boolean isJsonArray = isJsonArray((String) json);
-            if (isJsonArray) {
-                jsonObject = convertArrayToObject(new JSONArray((String) json));
-            } else {
-                jsonObject = new JSONObject((String) json);
-            }
-            return getJsoNprop(jsonObject, props);
-        }
-        if (json instanceof JSONObject) {
-            jsonObject = (JSONObject) json;
-        } else {
-            jsonObject = new JSONObject(gson.toJson(json));
-        }
-
-        return getJsoNprop(jsonObject, props);
-    }
-
-    public <T> T get(String name) {
-        return getProp(name, json).as();
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T get() {
-        JSONProp prop = getProp("", json);
-        if (prop.isArray()) {
-            return (T) prop.asList();
-        }
-        return getProp("", json).as();
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T get(Class<?> clazz) {
-        JSONProp prop = getProp("", json);
-        if (prop.isArray()) {
-            return (T) prop.asList(clazz);
-        }
-        return getProp("", json).as();
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T get(String name, Class<?> clazz) {
-        JSONProp prop = getProp(name, json);
-        if (prop.isArray()) {
-            return (T) prop.asList(clazz);
-        }
-        return (T) getProp(name, json).as(clazz);
-    }
-
-
     public static JSONProp getProp(String name, Object json) {
         JSONObject jsonObject;
         if (name.trim().isEmpty()) {
@@ -164,6 +108,66 @@ public class JsonHelper {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @Override
+    public String toString() {
+        return gson.toJson(this.json);
+    }
+
+    public JSONProp getProp(String name) {
+        JSONObject jsonObject;
+        if (name.trim().isEmpty()) {
+            return new JSONProp(json);
+        }
+        String[] props = name.trim().split("\\.");
+        if (json instanceof String) {
+            boolean isJsonArray = isJsonArray((String) json);
+            if (isJsonArray) {
+                jsonObject = convertArrayToObject(new JSONArray((String) json));
+            } else {
+                jsonObject = new JSONObject((String) json);
+            }
+            return getJsoNprop(jsonObject, props);
+        }
+        if (json instanceof JSONObject) {
+            jsonObject = (JSONObject) json;
+        } else {
+            jsonObject = new JSONObject(gson.toJson(json));
+        }
+
+        return getJsoNprop(jsonObject, props);
+    }
+
+    public <T> T get(String name) {
+        return getProp(name, json).as();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T get() {
+        JSONProp prop = getProp("", json);
+        if (prop.isArray()) {
+            return (T) prop.asList();
+        }
+        return getProp("", json).as();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T get(Class<?> clazz) {
+        JSONProp prop = getProp("", json);
+        if (prop.isArray()) {
+            return (T) prop.asList(clazz);
+        }
+        return getProp("", json).as();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T get(String name, Class<?> clazz) {
+        JSONProp prop = getProp(name, json);
+        if (prop.isArray()) {
+            return (T) prop.asList(clazz);
+        }
+        return (T) getProp(name, json).as(clazz);
     }
 
     @SuppressWarnings("unused")
