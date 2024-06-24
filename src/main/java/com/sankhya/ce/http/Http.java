@@ -2,13 +2,13 @@ package com.sankhya.ce.http;
 
 import br.com.sankhya.ws.ServiceContext;
 import com.google.gson.Gson;
+import com.sankhya.ce.tuples.Pair;
+import com.sankhya.ce.tuples.Triple;
 import okhttp3.*;
 import okhttp3.internal.http.RealResponseBody;
 import okio.GzipSource;
 import okio.InflaterSource;
 import okio.Okio;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
 
 import javax.servlet.http.Cookie;
 import java.io.IOException;

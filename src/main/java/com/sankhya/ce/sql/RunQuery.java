@@ -5,7 +5,6 @@ import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.sql.NativeSql;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
-import com.sankhya.util.JdbcUtils;
 import org.json.JSONObject;
 
 import java.sql.ResultSet;
@@ -22,8 +21,7 @@ public class RunQuery {
     private NativeSql sql;
     private final JapeSession.SessionHandle hnd = JapeSession.open();
     private ResultSet resultSet = null;
-    private boolean status
-            ;
+    private boolean status;
 
     public boolean isStatus() {
         return status;
@@ -158,10 +156,20 @@ public class RunQuery {
      * Closes the database connection and clears the ResultSet data
      */
     public void close() {
-        if (resultSet != null) JdbcUtils.closeResultSet(resultSet);
+        if (resultSet != null) closeResultSet(resultSet);
         if (sql != null) NativeSql.releaseResources(sql);
         if (jdbc != null) JdbcWrapper.closeSession(jdbc);
+
         JapeSession.close(hnd);
+    }
+
+    private static void closeResultSet(ResultSet rset) {
+        if (rset != null) {
+            try {
+                rset.close();
+            } catch (Exception ignored) {
+            }
+        }
     }
 }
 

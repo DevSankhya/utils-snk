@@ -1,10 +1,31 @@
 plugins {
     id("java")
     id("application")
+    `maven-publish`
+    signing
+}
+
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Luisricardo2825/UtilsSNK")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
+            }
+        }
+    }
+    publications {
+        register<MavenPublication>("gpr") {
+            from(components["java"])
+        }
+    }
 }
 
 group = "com.sankhya.ce"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -27,11 +48,11 @@ java {
 }
 
 
+
 tasks {
     jar {
-        archiveBaseName.set("UtilsSNK")
-        archiveVersion.set("0.1.1")
-
+        archiveBaseName.set("utils-snk")
+        archiveVersion.set("1.0.0")
         dependencies {
             implementation(fileTree("libs"))
         }
