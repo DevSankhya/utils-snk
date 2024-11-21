@@ -2,18 +2,16 @@ plugins {
     id("java")
     id("application")
     `maven-publish`
-    signing
+
 }
-
-
 publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/DevSankhya/UtilsSNK")
+            url = uri("https://maven.pkg.github.com/devsankhya/utils-snk")
             credentials {
-                username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
-                password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
+                username = System.getenv("USERNAME")
+                password = System.getenv("TOKEN")
             }
         }
     }
@@ -25,7 +23,7 @@ publishing {
 }
 
 group = "com.sankhya.ce"
-version = "1.0.0"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -52,7 +50,7 @@ java {
 tasks {
     jar {
         archiveBaseName.set("utils-snk")
-        archiveVersion.set("1.0.0")
+        archiveVersion.set("1.0.1")
         dependencies {
             implementation(fileTree("libs"))
         }
