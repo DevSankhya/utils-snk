@@ -56,7 +56,8 @@ public class Async {
     private static @NotNull Runnable getRunnable(Task task) {
         return () -> {
             try {
-                task.action();
+                if (task != null)
+                    task.action();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -83,16 +84,38 @@ public class Async {
     public void runChunked(int chunkSize) {
         List<List<Task>> chunks = generateChunks(tasks, chunkSize);
         for (List<Task> chunk : chunks) {
-            ExecutorService executorService = Executors.newFixedThreadPool(10);
+            ExecutorService executorService = Executors.newFixedThreadPool(5);
             List<CompletableFuture<Void>> futures = new ArrayList<>();
 
             for (Task task : chunk) {
                 String description = task.getDescription();
 
                 if (description != null && !description.isEmpty()) {
-                    System.out.println("Description: "+description);
+                    System.out.println("Description: " + description);
                 }
-                CompletableFuture<Void> future = CompletableFuture.runAsync(getRunnable(task), executorService);
+                CompletableFuture<Void> future = CompletableFuture.runAsync(getRunnable(task));
+                futures.add(future);
+            }
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).
+                    join();
+            executorService.shutdown();
+        }
+    }
+
+    public void runChunked() {
+        List<List<Task>> chunks = generateChunks(tasks, 5);
+        for (List<Task> chunk : chunks) {
+            ExecutorService executorService = Executors.newFixedThreadPool(5);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+            for (Task task : chunk) {
+                String description = task.getDescription();
+
+                if (description != null && !description.isEmpty()) {
+                    System.out.println("Description: " + description);
+                }
+                CompletableFuture<Void> future = CompletableFuture.runAsync(getRunnable(task));
                 futures.add(future);
             }
 

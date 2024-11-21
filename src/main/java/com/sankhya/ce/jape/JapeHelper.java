@@ -1,16 +1,23 @@
 package com.sankhya.ce.jape;
 
+import br.com.sankhya.jape.EntityFacade;
 import br.com.sankhya.jape.core.JapeSession;
+import br.com.sankhya.jape.dao.JdbcWrapper;
+import br.com.sankhya.jape.sql.NativeSql;
 import br.com.sankhya.jape.vo.DynamicVO;
 import br.com.sankhya.jape.wrapper.JapeFactory;
 import br.com.sankhya.jape.wrapper.JapeWrapper;
 import br.com.sankhya.jape.wrapper.fluid.FluidCreateVO;
 import br.com.sankhya.jape.wrapper.fluid.FluidUpdateVO;
 import br.com.sankhya.modelcore.MGEModelException;
+import br.com.sankhya.modelcore.util.EntityFacadeFactory;
+import com.sankhya.ce.sql.Clauses;
+import com.sankhya.ce.sql.RunQuery;
+import org.json.JSONObject;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.sql.PreparedStatement;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @SuppressWarnings({"unused"})
 public class JapeHelper {
@@ -37,11 +44,87 @@ public class JapeHelper {
             }
             return fluidCreateVO.save();
         } catch (Exception e) {
+            if (e.getMessage().contains("transação ativa"))
+                return createNewLine(values, instance, true);
             throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
         } finally {
             JapeSession.close(hnd);
         }
     }
+
+    private static DynamicVO createNewLine(HashMap<String, Object> values, String instance, Boolean repeat) throws MGEModelException {
+
+        JapeSession.SessionHandle hnd = null;
+        StringBuilder listValues = new StringBuilder();
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidCreateVO fluidCreateVO = instanciaDAO.create();
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                fluidCreateVO.set(name, value);
+                listValues.append(name).append("= ").append(value).append("\n");
+            }
+            return fluidCreateVO.save();
+        } catch (Exception e) {
+            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    private static JSONObject insertJDBC(HashMap<String, Object> values, String table, Boolean repeat) throws MGEModelException {
+
+        StringBuilder listValues = new StringBuilder();
+        NativeSql sql = null;
+        try {
+            JdbcWrapper jdbc = null;
+            EntityFacade dwfEntityFacade = EntityFacadeFactory.getDWFFacade();
+            jdbc = dwfEntityFacade.getJdbcWrapper();
+            jdbc.openSession();
+
+            sql = new NativeSql(jdbc);
+//            PreparedStatement preparedStatement = jdbc.getPreparedStatement("");
+            Set<String> fieldsSet = values.keySet();
+            String fields = Clauses.toSqlInClause(fieldsSet);
+            String params = Clauses.toSqlInClause(fieldsSet.stream().map(item -> "?").collect(Collectors.toList()));
+            List<Object> insertValues = new ArrayList<>();
+            String insert = "INSERT INTO " + table + " " + fields + " VALUES " + params + ";";
+            sql.appendSql(insert);
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                listValues.append(name).append("= ").append(value).append("\n");
+            }
+
+            sql.executeUpdate();
+            String codition = fieldsSet.stream().map(o -> o + "=?").collect(Collectors.joining());
+
+            sql = new NativeSql(jdbc);
+            String select = "Select * from " + table +"  where  " + codition + ";";
+            sql.appendSql(select);
+            NativeSql finalSql = sql;
+
+
+            RunQuery runQuery = new RunQuery(select, (nativeSql -> {
+                values.values().forEach(nativeSql::addParameter);
+                return nativeSql;
+            }), false);
+
+            List<JSONObject> results = runQuery.toList();
+
+            if(results.isEmpty())
+                return null;
+            return results.get(0);
+        } catch (Exception e) {
+            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+        } finally {
+            NativeSql.releaseResources(sql);
+            NativeSql.releaseResources(sql);
+        }
+    }
+
 
     /**
      * Retorna o valor de um campo(PK)
@@ -88,6 +171,7 @@ public class JapeHelper {
             JapeSession.close(hnd);
         }
     }
+
     @SuppressWarnings({"unchecked", "unused"})
     public static <T> T getCampo(String name, String where, String instancia, boolean canBeNull) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
@@ -122,7 +206,7 @@ public class JapeHelper {
             hnd = JapeSession.open();
             JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
             dynamicVo = instanciaDAO.findOne(where);
-        } catch (java.lang.Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             throw new MGEModelException("Erro getVO: " + e.getMessage());
         } finally {
@@ -158,7 +242,7 @@ public class JapeHelper {
             hnd = JapeSession.open();
             JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
             dynamicVo = instanciaDAO.find(where);
-        } catch (java.lang.Exception e) {
+        } catch (Exception e) {
             throw new MGEModelException("Erro getVO: " + e.getMessage());
         } finally {
             JapeSession.close(hnd);

@@ -1,5 +1,7 @@
 .gradle
 build/
+gradle.properties
+src/main/java/com/sankhya/ce/Main.java
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

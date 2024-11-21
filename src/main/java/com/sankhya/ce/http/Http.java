@@ -25,7 +25,10 @@ public class Http {
     private static final Gson gson = new Gson();
     private static final String regexContainsProtocol = "(^http://)|(^https://)";
     private static String localHost = "";
-    private final OkHttpClient okHttpClient = new OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).writeTimeout(5, TimeUnit.SECONDS).readTimeout(5, TimeUnit.SECONDS).build();
+    private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+    private long timeOut = 60;
+    private final TimeUnit timeUnit = TimeUnit.SECONDS;
+    private final OkHttpClient okHttpClient = new OkHttpClient.Builder().connectTimeout(timeOut, TimeUnit.SECONDS).writeTimeout(timeOut, TimeUnit.SECONDS).readTimeout(timeOut, TimeUnit.SECONDS).build();
     private Map<String, String> headersParams = new HashMap<>();
     private Params queryParams = new Params();
     private String contentType = "application/json";
@@ -69,6 +72,14 @@ public class Http {
             String protocol = ServiceContext.getCurrent().getHttpRequest().getProtocol().split("/")[0].toLowerCase();
             localHost = protocol + "://" + baseurl + ":" + porta;
         }
+    }
+
+    public long getTimeOut() {
+        return timeOut;
+    }
+
+    public void setTimeOut(long timeOut) {
+        this.timeOut = timeOut;
     }
 
     public String getContentType() {

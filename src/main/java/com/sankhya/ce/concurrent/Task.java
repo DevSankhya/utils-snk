@@ -13,12 +13,16 @@ public interface Task {
      *
      * @return the order of the task.
      */
-    int getOrder();
+    default int getOrder() {
+        return 0;
+    }
 
     /**
      * The description of the task.
      *
      * @return the description of the task.
      */
-    String getDescription();
+    default String getDescription() {
+        return null;
+    };
 }

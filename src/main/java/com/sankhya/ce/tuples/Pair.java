@@ -1,29 +1,39 @@
 package com.sankhya.ce.tuples;
 
-public class Pair<L, R> {
-    private L left;
-    private R right;
+import java.io.Serializable;
 
-    public Pair(L left, R right) {
-        this.left = left;
-        this.right = right;
+public class Pair<F, S> implements Serializable {
+    private final F first;
+    private final S second;
+
+    public Pair(F first, S second) {
+        this.first = first;
+        this.second = second;
     }
 
 
     public String toString() {
-        return "Pair(" + left + ", " + right + ")";
+        return "Pair(" + first + ", " + second + ")";
     }
 
-    public static <L, R>  Pair<L, R> of(L left, R right) {
+    public static <F, S> Pair<F, S> of(F left, S right) {
         return new Pair<>(left, right);
     }
 
-    public L getLeft() {
-        return left;
+    public F getLeft() {
+        return first;
     }
 
-    public R getRight() {
-        return right;
+    public S getRight() {
+        return second;
+    }
+
+    public F component1() {
+        return first;
+    }
+
+    public S component2() {
+        return second;
     }
 }
 

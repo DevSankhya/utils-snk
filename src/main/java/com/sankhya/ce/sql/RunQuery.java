@@ -3,7 +3,10 @@ package com.sankhya.ce.sql;
 import br.com.sankhya.jape.EntityFacade;
 import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.JdbcWrapper;
+import br.com.sankhya.jape.event.TransactionContext;
 import br.com.sankhya.jape.sql.NativeSql;
+import br.com.sankhya.jape.util.JapeSessionContext;
+import br.com.sankhya.jape.wrapper.JapeFactory;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
 import org.json.JSONObject;
 

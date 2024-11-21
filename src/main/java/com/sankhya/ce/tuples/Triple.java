@@ -1,37 +1,49 @@
 package com.sankhya.ce.tuples;
 
-public class Triple<L, M, R> {
-    private final L left;
-    private final M middle;
-    private final R right;
+public class Triple<F, S, T> {
+    private final F first;
+    private final S second;
+    private final T third;
 
-    public Triple(L left, M middle, R right) {
-        this.left = left;
-        this.middle = middle;
-        this.right = right;
+    public Triple(F first, S second, T third) {
+        this.first = first;
+        this.second = second;
+        this.third = third;
 
     }
 
-    public L getLeft() {
-        return left;
+    public F getFirst() {
+        return first;
     }
 
-    public M getMiddle() {
-        return middle;
+    public S getSecond() {
+        return second;
     }
 
-    public R getRight() {
-        return right;
+    public T getThird() {
+        return third;
     }
 
-    public static <L, M, R> Triple<L, M, R> of(L left, M middle, R right) {
-        return new Triple<>(left, middle, right);
+    public static <L, M, R> Triple<L, M, R> of(L first, M second, R third) {
+        return new Triple<>(first, second, third);
     }
 
     @Override
     public String toString() {
-        return "(" + left + "," + middle + "," + right + ")";
+        return "(" + first + "," + second + "," + third + ")";
 
+    }
+
+
+    public F component1() {
+        return first;
+    }
+
+    public S component2() {
+        return second;
+    }
+    public T component3() {
+        return third;
     }
 
 }
