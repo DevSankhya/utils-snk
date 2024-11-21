@@ -102,7 +102,7 @@ public class JapeHelper {
             String codition = fieldsSet.stream().map(o -> o + "=?").collect(Collectors.joining());
 
             sql = new NativeSql(jdbc);
-            String select = "Select * from " + table +"  where  " + codition + ";";
+            String select = "Select * from " + table + "  where  " + codition + ";";
             sql.appendSql(select);
             NativeSql finalSql = sql;
 
@@ -114,7 +114,7 @@ public class JapeHelper {
 
             List<JSONObject> results = runQuery.toList();
 
-            if(results.isEmpty())
+            if (results.isEmpty())
                 return null;
             return results.get(0);
         } catch (Exception e) {
@@ -208,7 +208,7 @@ public class JapeHelper {
             dynamicVo = instanciaDAO.findOne(where);
         } catch (Exception e) {
             e.printStackTrace();
-            throw new MGEModelException("Erro getVO: " + e.getMessage());
+            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
         } finally {
             JapeSession.close(hnd);
         }
@@ -243,7 +243,7 @@ public class JapeHelper {
             JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
             dynamicVo = instanciaDAO.find(where);
         } catch (Exception e) {
-            throw new MGEModelException("Erro getVO: " + e.getMessage());
+            throw new MGEModelException("Erro getVOs(" + instancia + "): " + e.getMessage());
         } finally {
             JapeSession.close(hnd);
         }
