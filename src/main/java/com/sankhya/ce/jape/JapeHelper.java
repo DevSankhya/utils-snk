@@ -12,10 +12,12 @@ import br.com.sankhya.jape.wrapper.fluid.FluidUpdateVO;
 import br.com.sankhya.modelcore.MGEModelException;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
 import com.sankhya.ce.sql.Clauses;
+import com.sankhya.ce.sql.ResolveSqlTypes;
 import com.sankhya.ce.sql.RunQuery;
 import org.json.JSONObject;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,8 +46,7 @@ public class JapeHelper {
             }
             return fluidCreateVO.save();
         } catch (Exception e) {
-            if (e.getMessage().contains("transação ativa"))
-                return createNewLine(values, instance, true);
+            if (e.getMessage().contains("transação ativa")) return createNewLine(values, instance, true);
             throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
         } finally {
             JapeSession.close(hnd);
@@ -114,8 +115,7 @@ public class JapeHelper {
 
             List<JSONObject> results = runQuery.toList();
 
-            if (results.isEmpty())
-                return null;
+            if (results.isEmpty()) return null;
             return results.get(0);
         } catch (Exception e) {
             throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
@@ -215,6 +215,46 @@ public class JapeHelper {
         return dynamicVo;
     }
 
+
+    private static ResolveSqlTypes.Database getDialect() {
+        try {
+            String databaseProductName = EntityFacadeFactory.getDWFFacade().getJdbcWrapper().getDataSource().getConnection().getMetaData().getDatabaseProductName();
+
+            if (databaseProductName.equalsIgnoreCase("oracle")) {
+                return ResolveSqlTypes.Database.ORACLE;
+            }
+            return ResolveSqlTypes.Database.MSSQL;
+        } catch (Exception e) {
+            return ResolveSqlTypes.Database.UNKNOW;
+        }
+    }
+
+    /**
+     * Retorna o DynamicVO baseado em uma consulta
+     *
+     * @param instancia Nome da instancia
+     * @param where     Condição para retornar o registro
+     */
+    @SuppressWarnings({"unused"})
+    public static DynamicVO getVO(String instancia, String where, Object... values) throws MGEModelException {
+        DynamicVO dynamicVo;
+        JapeSession.SessionHandle hnd = null;
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, values);
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.findOne(where);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+        return dynamicVo;
+    }
+
+
     public static boolean deleteVO(DynamicVO vo, String instance) throws MGEModelException {
 
         JapeSession.SessionHandle hnd = null;
@@ -227,27 +267,6 @@ public class JapeHelper {
         } finally {
             JapeSession.close(hnd);
         }
-    }
-
-    /**
-     * Retorna os registros baseados em uma consulta
-     *
-     * @param instancia Nome da instancia
-     * @param where     Condição para retornar o registro
-     */
-    public static Collection<DynamicVO> getVOs(String instancia, String where) throws MGEModelException {
-        Collection<DynamicVO> dynamicVo;
-        JapeSession.SessionHandle hnd = null;
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
-            dynamicVo = instanciaDAO.find(where);
-        } catch (Exception e) {
-            throw new MGEModelException("Erro getVOs(" + instancia + "): " + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-        return dynamicVo;
     }
 
     /**
@@ -272,6 +291,29 @@ public class JapeHelper {
         } finally {
             JapeSession.close(hnd);
         }
+    }
+
+    /**
+     * Retorna os registros baseados em uma consulta
+     *
+     * @param instancia Nome da instancia
+     * @param where     Condição para retornar o registro
+     */
+    public static Collection<DynamicVO> getVOs(String instancia, String where, Object... values) throws MGEModelException {
+        Collection<DynamicVO> dynamicVo;
+        JapeSession.SessionHandle hnd = null;
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, values);
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.find(where);
+        } catch (Exception e) {
+            throw new MGEModelException("Erro getVOs(" + instancia + "): " + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+        return dynamicVo;
     }
 
     /**

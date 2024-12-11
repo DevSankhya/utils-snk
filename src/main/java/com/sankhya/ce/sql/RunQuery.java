@@ -46,6 +46,7 @@ public class RunQuery {
             jdbc.openSession();
             sql = new NativeSql(jdbc);
             sql.appendSql(query);
+
             if (callBack != null) {
                 sql = callBack.apply(sql);
             }
