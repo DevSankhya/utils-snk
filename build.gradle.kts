@@ -9,7 +9,6 @@ plugins {
 
 val archiveBaseName by extra("utils-snk")
 // Propriedades customizadas(arquivo "gradle.properties")
-val githubToken: String by project
 
 publishing {
     repositories {
@@ -79,33 +78,5 @@ tasks {
         dependencies {
             implementation(fileTree("libs"))
         }
-    }
-}
-fun checkIfVersionAlreadyExist(): Boolean {
-    val version = "1.0.2"
-    val url =
-        "https://maven.pkg.github.com/devsankhya/utils-snk/com/sankhya/ce/$archiveBaseName/$version/$archiveBaseName-$version.jar"
-    // Add credential using environment variables
-    System.setProperty("username", System.getenv("USERNAME"))
-    val response = URL(url).openConnection()
-    response.setRequestProperty("Authorization", "Bearer $githubToken");
-    val exists = try {
-        response.connect()
-        val check = response.getInputStream().read() > -1
-        check
-    } catch (e: Exception) {
-        false
-    }
-    if (exists) {
-        println("Version $version already exists")
-    }
-    return exists
-}
-
-tasks.named("publishGprPublicationToGitHubPackagesRepository") {
-    val versionExists = checkIfVersionAlreadyExist()
-
-    onlyIf {
-        !versionExists
     }
 }
