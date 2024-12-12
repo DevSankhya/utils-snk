@@ -1,9 +1,16 @@
+import java.net.URL
+
 plugins {
     id("java")
     id("application")
     `maven-publish`
 
 }
+
+val archiveBaseName by extra("utils-snk")
+// Propriedades customizadas(arquivo "gradle.properties")
+val githubToken: String by project
+
 publishing {
     repositories {
         maven {
@@ -24,9 +31,8 @@ publishing {
 
 group = "com.sankhya.ce"
 // Use github tag variable
-version = System.getenv("GITHUB_REF_NAME")?.toLowerCase()?.removePrefix("v")
-    ?: System.getenv("VERSION")?.toLowerCase()
-        ?.removePrefix("v") ?: getLatestTag().removePrefix("v")
+version = System.getenv("GITHUB_REF_NAME")?.toLowerCase()?.removePrefix("v") ?: System.getenv("VERSION")?.toLowerCase()
+    ?.removePrefix("v") ?: getLatestTag().removePrefix("v")
 
 fun getLatestTag(): String {
     val process = Runtime.getRuntime().exec("git describe --tags --abbrev=0")
@@ -36,12 +42,10 @@ fun getLatestTag(): String {
     reader.close()
     process.destroy()
     // Sum 1 to the tag
-    println(tag)
     val tagParts = tag.split(".").toMutableList()
     val lastPart = tagParts.last().toInt() + 1
     tagParts[tagParts.size - 1] = lastPart.toString()
     val newTag = tagParts.joinToString(".").replace("v", "")
-    println(newTag)
     return newTag
 }
 
@@ -68,11 +72,40 @@ java {
 
 
 tasks {
+    val archiveBaseName: String by extra
     jar {
-        archiveBaseName.set("utils-snk")
+        this.archiveBaseName.set(archiveBaseName)
         archiveVersion.set("1.0.1")
         dependencies {
             implementation(fileTree("libs"))
         }
+    }
+}
+fun checkIfVersionAlreadyExist(): Boolean {
+    val version = "1.0.2"
+    val url =
+        "https://maven.pkg.github.com/devsankhya/utils-snk/com/sankhya/ce/$archiveBaseName/$version/$archiveBaseName-$version.jar"
+    // Add credential using environment variables
+    System.setProperty("username", System.getenv("USERNAME"))
+    val response = URL(url).openConnection()
+    response.setRequestProperty("Authorization", "Bearer $githubToken");
+    val exists = try {
+        response.connect()
+        val check = response.getInputStream().read() > -1
+        check
+    } catch (e: Exception) {
+        false
+    }
+    if (exists) {
+        println("Version $version already exists")
+    }
+    return exists
+}
+
+tasks.named("publishGprPublicationToGitHubPackagesRepository") {
+    val versionExists = checkIfVersionAlreadyExist()
+
+    onlyIf {
+        !versionExists
     }
 }
