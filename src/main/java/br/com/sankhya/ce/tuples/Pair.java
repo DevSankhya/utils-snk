@@ -1,4 +1,4 @@
-package com.sankhya.ce.tuples;
+package br.com.sankhya.ce.tuples;
 
 import java.io.Serializable;
 

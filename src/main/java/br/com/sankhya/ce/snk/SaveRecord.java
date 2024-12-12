@@ -1,21 +1,15 @@
-package com.sankhya.ce.snk;
+package br.com.sankhya.ce.snk;
 
 import br.com.sankhya.ws.ServiceContext;
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
-import com.sankhya.ce.concurrent.Task;
 import okhttp3.*;
-import okhttp3.internal.http.RealResponseBody;
-import okio.GzipSource;
-import okio.InflaterSource;
-import okio.Okio;
 
 import javax.servlet.http.Cookie;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.Inflater;
 
 public class SaveRecord {
     HashMap<String, Object> campos = new HashMap<>();

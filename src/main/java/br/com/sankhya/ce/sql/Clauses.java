@@ -1,4 +1,4 @@
-package com.sankhya.ce.sql;
+package br.com.sankhya.ce.sql;
 
 import java.util.Arrays;
 import java.util.Iterator;

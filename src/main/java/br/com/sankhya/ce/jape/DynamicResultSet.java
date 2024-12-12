@@ -1,4 +1,4 @@
-package com.sankhya.ce.jape;
+package br.com.sankhya.ce.jape;
 
 import br.com.sankhya.jape.vo.DynamicVO;
 

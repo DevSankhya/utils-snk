@@ -1,4 +1,4 @@
-package com.sankhya.ce.concurrent;
+package br.com.sankhya.ce.concurrent;
 
 public class TaskHelper implements Task {
 

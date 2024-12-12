@@ -1,6 +1,6 @@
-package com.sankhya.ce.data;
+package br.com.sankhya.ce.data;
 
-import com.sankhya.ce.tuples.Pair;
+import br.com.sankhya.ce.tuples.Pair;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;

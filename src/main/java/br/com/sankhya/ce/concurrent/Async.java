@@ -1,4 +1,4 @@
-package com.sankhya.ce.concurrent;
+package br.com.sankhya.ce.concurrent;
 
 import org.jetbrains.annotations.NotNull;
 

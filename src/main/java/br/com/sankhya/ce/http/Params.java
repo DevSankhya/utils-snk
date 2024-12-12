@@ -1,4 +1,4 @@
-package com.sankhya.ce.http;
+package br.com.sankhya.ce.http;
 
 import java.util.HashMap;
 

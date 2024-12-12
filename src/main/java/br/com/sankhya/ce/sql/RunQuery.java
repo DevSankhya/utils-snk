@@ -1,4 +1,4 @@
-package com.sankhya.ce.sql;
+package br.com.sankhya.ce.sql;
 
 import br.com.sankhya.jape.EntityFacade;
 import br.com.sankhya.jape.core.JapeSession;

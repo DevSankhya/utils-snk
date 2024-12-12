@@ -1,5 +1,8 @@
-package com.sankhya.ce.jape;
+package br.com.sankhya.ce.jape;
 
+import br.com.sankhya.ce.sql.Clauses;
+import br.com.sankhya.ce.sql.ResolveSqlTypes;
+import br.com.sankhya.ce.sql.RunQuery;
 import br.com.sankhya.jape.EntityFacade;
 import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.JdbcWrapper;
@@ -11,13 +14,8 @@ import br.com.sankhya.jape.wrapper.fluid.FluidCreateVO;
 import br.com.sankhya.jape.wrapper.fluid.FluidUpdateVO;
 import br.com.sankhya.modelcore.MGEModelException;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
-import com.sankhya.ce.sql.Clauses;
-import com.sankhya.ce.sql.ResolveSqlTypes;
-import com.sankhya.ce.sql.RunQuery;
 import org.json.JSONObject;
 
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 

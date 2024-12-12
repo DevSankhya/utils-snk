@@ -1,4 +1,4 @@
-package com.sankhya.ce.files;
+package br.com.sankhya.ce.files;
 
 import java.io.BufferedReader;
 import java.io.InputStream;

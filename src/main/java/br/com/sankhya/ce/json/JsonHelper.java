@@ -1,4 +1,4 @@
-package com.sankhya.ce.json;
+package br.com.sankhya.ce.json;
 
 import com.google.gson.Gson;
 import org.json.JSONArray;

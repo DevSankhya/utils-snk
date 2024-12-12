@@ -1,4 +1,4 @@
-package com.sankhya.ce.tuples;
+package br.com.sankhya.ce.tuples;
 
 public class Triple<F, S, T> {
     private final F first;

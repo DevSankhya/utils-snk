@@ -1,6 +1,5 @@
-package com.sankhya.ce.sql;
+package br.com.sankhya.ce.sql;
 
-import com.sankhya.ce.data.ConvertHelper;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.Timestamp;
