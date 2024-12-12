@@ -7,6 +7,9 @@ plugins {
 
 }
 
+val skwVersion = "master"
+group = "br.com.sankhya.ce"
+
 val archiveBaseName by extra("utils-snk")
 // Propriedades customizadas(arquivo "gradle.properties")
 
@@ -28,7 +31,6 @@ publishing {
     }
 }
 
-group = "com.sankhya.ce"
 // Use github tag variable
 version = System.getenv("GITHUB_REF_NAME")?.toLowerCase()?.removePrefix("v") ?: System.getenv("VERSION")?.toLowerCase()
     ?.removePrefix("v") ?: getLatestTag().removePrefix("v")
@@ -50,15 +52,54 @@ fun getLatestTag(): String {
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://nexus-repository.sankhya.com.br/repository/maven-public/")
+    }
+    maven {
+        url = uri("https://nexus-repository.sankhya.com.br/repository/maven-devcenter-releases")
+    }
+    maven {
+        url = uri("https://repository.jboss.org/nexus/content/repositories/thirdparty-releases/")
+    }
+    maven {
+        url = uri("https://maven.oracle.com")
+    }
+
+
 }
 
 dependencies {
-    implementation("org.jetbrains:annotations:20.1.0")
-    implementation(fileTree("libs"))
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
+    implementation("br.com.sankhya", "mge-modelcore", skwVersion)
+    implementation("br.com.sankhya", "jape", skwVersion)
+    implementation("br.com.sankhya", "dwf", skwVersion)
+    implementation("br.com.sankhya", "sanws", skwVersion)
+    implementation("br.com.sankhya", "mge-param", skwVersion)
+    implementation("br.com.sankhya", "skw-environment", skwVersion)
+    implementation("br.com.sankhya", "sanutil", skwVersion)
+    implementation("br.com.sankhya", "cuckoo", skwVersion)
+    implementation("br.com.sankhya", "mgecom-model", skwVersion)
+    implementation("br.com.sankhya", "mgefin-model", skwVersion)
+    implementation("org.json", "json", "20240303")
+
+    // Status HTTP / Apoio as Servlets
+    implementation("com.squareup.okhttp3:okhttp:3.9.0")
+    // https://mvnrepository.com/artifact/com.squareup.okio/okio
+    implementation("com.squareup.okio:okio:1.13.0")
+    implementation("org.jetbrains:annotations:24.0.0")
+
+    // Manipulador de JSON
+    implementation("com.google.code.gson", "gson", "2.1")
+
+    // EJB / Escrever no container wildfly
+    implementation("org.wildfly:wildfly-spec-api:16.0.0.Final")
+//    implementation("org.jdom", "jdom", "1.1.3")
+//    implementation("com.oracle.database.jdbc:ojdbc8:19.11.0.0")
 }
 
+dependencies {
+    testImplementation(platform("org.junit:junit-bom:5.10.0"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+}
 tasks.getByName<Test>("test") {
     useJUnitPlatform()
 }
@@ -74,9 +115,6 @@ tasks {
     val archiveBaseName: String by extra
     jar {
         this.archiveBaseName.set(archiveBaseName)
-        archiveVersion.set("1.0.1")
-        dependencies {
-            implementation(fileTree("libs"))
-        }
+        archiveVersion.set(project.version.toString())
     }
 }

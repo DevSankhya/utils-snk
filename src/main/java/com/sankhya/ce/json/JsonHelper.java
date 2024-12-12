@@ -139,6 +139,19 @@ public class JsonHelper {
         return getJsoNprop(jsonObject, props);
     }
 
+    public static boolean has(String name, Object json) {
+        try {
+            getProp(name, json);
+            return true;
+        } catch (JSONException e) {
+            return false;
+        }
+    }
+
+    public boolean has(String name) {
+        return has(name, json);
+    }
+
     public <T> T get(String name) {
         return getProp(name, json).as();
     }
