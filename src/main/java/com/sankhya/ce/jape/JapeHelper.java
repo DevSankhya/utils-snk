@@ -217,15 +217,16 @@ public class JapeHelper {
 
 
     private static ResolveSqlTypes.Database getDialect() {
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        JdbcWrapper jdbcWrapper = dwfFacade.getJdbcWrapper();
+        String databaseProductName = "unknown";
         try {
-            String databaseProductName = EntityFacadeFactory.getDWFFacade().getJdbcWrapper().getDataSource().getConnection().getMetaData().getDatabaseProductName();
-
-            if (databaseProductName.equalsIgnoreCase("oracle")) {
-                return ResolveSqlTypes.Database.ORACLE;
-            }
+            if (jdbcWrapper.isOracle()) return ResolveSqlTypes.Database.ORACLE;
             return ResolveSqlTypes.Database.MSSQL;
         } catch (Exception e) {
             return ResolveSqlTypes.Database.UNKNOW;
+        } finally {
+            jdbcWrapper.closeSession();
         }
     }
 
