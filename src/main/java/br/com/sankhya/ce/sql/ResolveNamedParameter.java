@@ -1,44 +1,38 @@
 package br.com.sankhya.ce.sql;
 
+import br.com.sankhya.ce.tuples.Pair;
 import org.jetbrains.annotations.NotNull;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
-public class ResolveSqlTypes {
-    Database type;
+public class ResolveNamedParameter {
+    ResolveSqlTypes.Database type;
+    List<Pair<String, Object>> parameters = new ArrayList<>();
 
-    public enum Database {
-        ORACLE,
-        MSSQL,
-        UNKNOW
-    }
-
-    public ResolveSqlTypes(Database db) {
+    public ResolveNamedParameter(ResolveSqlTypes.Database db) {
         type = db;
     }
 
+    public void set(String key, Object value) {
+        parameters.add(new Pair<>(key, value));
+    }
 
-    public String replaceParameters(String sql, Object... parameters) {
+    public final String replaceNamedParameters(String sql) {
+        if (parameters.isEmpty()) return sql;
+
         StringBuilder result = new StringBuilder();
-        int paramIndex = 0;
-
-        for (int i = 0; i < sql.length(); i++) {
-            char currentChar = sql.charAt(i);
-
-            if (currentChar == '?' && i + 1 < sql.length() && sql.charAt(i + 1) == '?') {
-                result.append("?");
-                i++; // Skip the next '?'
-            } else if (currentChar == '?' && paramIndex < parameters.length) {
-                Object parameter = parameters[paramIndex++];
-                result.append(formatParameter(parameter));
-            } else {
-                result.append(currentChar);
+        for (Pair<String, Object> parameter : parameters) {
+            String key = parameter.getLeft();
+            Object value = parameter.getRight();
+            int index = sql.indexOf(":" + key.trim());
+            if (index != -1) {
+                result.append(sql, 0, index);
+                result.append(formatParameter(value));
+                sql = sql.substring(index + key.length());
             }
-        }
-
-        if (paramIndex < parameters.length) {
-            throw new IllegalArgumentException("Not all parameters were used in the query.");
         }
 
         return result.toString();
@@ -53,9 +47,9 @@ public class ResolveSqlTypes {
             return parameter.toString();
         } else if (parameter instanceof Timestamp) {
             Timestamp timestamp = (Timestamp) parameter;
-            return type == Database.ORACLE ? getOracleDate(timestamp) : getMssqlDate(timestamp);
+            return type == ResolveSqlTypes.Database.ORACLE ? getOracleDate(timestamp) : getMssqlDate(timestamp);
         } else if (parameter instanceof Date) {
-            return type == Database.ORACLE ? getOracleDate((Date) parameter) : getMssqlDate((Date) parameter);
+            return type == ResolveSqlTypes.Database.ORACLE ? getOracleDate((Date) parameter) : getMssqlDate((Date) parameter);
         } else if (parameter instanceof Boolean) {
             return (Boolean) parameter ? "1" : "0";
         } else {

@@ -52,12 +52,9 @@ fun getLatestTag(): String {
 
 repositories {
     mavenCentral()
-    maven {
-        url = uri("https://nexus-repository.sankhya.com.br/repository/maven-public/")
-    }
-    maven {
-        url = uri("https://nexus-repository.sankhya.com.br/repository/maven-devcenter-releases")
-    }
+    mavenLocal()
+    maven { url = uri("https://jitpack.io") }
+
     maven {
         url = uri("https://repository.jboss.org/nexus/content/repositories/thirdparty-releases/")
     }
@@ -69,17 +66,19 @@ repositories {
 }
 
 dependencies {
-    implementation("br.com.sankhya", "mge-modelcore", skwVersion)
-    implementation("br.com.sankhya", "jape", skwVersion)
-    implementation("br.com.sankhya", "dwf", skwVersion)
-    implementation("br.com.sankhya", "sanws", skwVersion)
-    implementation("br.com.sankhya", "mge-param", skwVersion)
-    implementation("br.com.sankhya", "skw-environment", skwVersion)
-    implementation("br.com.sankhya", "sanutil", skwVersion)
-    implementation("br.com.sankhya", "cuckoo", skwVersion)
-    implementation("br.com.sankhya", "mgecom-model", skwVersion)
-    implementation("br.com.sankhya", "mgefin-model", skwVersion)
-    implementation("org.json", "json", "20240303")
+    implementation("com.github.DevSankhya:snk-wrapper:1.1.1")
+//
+//    implementation("br.com.sankhya", "mge-modelcore", skwVersion)
+//    implementation("br.com.sankhya", "jape", skwVersion)
+//    implementation("br.com.sankhya", "dwf", skwVersion)
+//    implementation("br.com.sankhya", "sanws", skwVersion)
+//    implementation("br.com.sankhya", "mge-param", skwVersion)
+//    implementation("br.com.sankhya", "skw-environment", skwVersion)
+//    implementation("br.com.sankhya", "sanutil", skwVersion)
+//    implementation("br.com.sankhya", "cuckoo", skwVersion)
+//    implementation("br.com.sankhya", "mgecom-model", skwVersion)
+//    implementation("br.com.sankhya", "mgefin-model", skwVersion)
+//    implementation("org.json", "json", "20240303")
 
     // Status HTTP / Apoio as Servlets
     implementation("com.squareup.okhttp3:okhttp:3.9.0")
@@ -92,7 +91,7 @@ dependencies {
 
     // EJB / Escrever no container wildfly
     implementation("org.wildfly:wildfly-spec-api:16.0.0.Final")
-//    implementation("org.jdom", "jdom", "1.1.3")
+    implementation("org.jdom", "jdom", "1.1.3")
 //    implementation("com.oracle.database.jdbc:ojdbc8:19.11.0.0")
 }
 

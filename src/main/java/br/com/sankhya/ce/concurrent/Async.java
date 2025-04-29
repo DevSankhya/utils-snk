@@ -36,7 +36,7 @@ public class Async {
      * Run the tasks asynchronously
      */
     public void run() {
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (Task task : tasks) {

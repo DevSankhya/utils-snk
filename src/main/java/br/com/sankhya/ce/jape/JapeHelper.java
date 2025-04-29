@@ -4,18 +4,25 @@ import br.com.sankhya.ce.sql.Clauses;
 import br.com.sankhya.ce.sql.ResolveSqlTypes;
 import br.com.sankhya.ce.sql.RunQuery;
 import br.com.sankhya.jape.EntityFacade;
+import br.com.sankhya.jape.bmp.PersistentLocalEntity;
 import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.sql.NativeSql;
 import br.com.sankhya.jape.vo.DynamicVO;
+import br.com.sankhya.jape.vo.EntityVO;
 import br.com.sankhya.jape.wrapper.JapeFactory;
 import br.com.sankhya.jape.wrapper.JapeWrapper;
 import br.com.sankhya.jape.wrapper.fluid.FluidCreateVO;
 import br.com.sankhya.jape.wrapper.fluid.FluidUpdateVO;
 import br.com.sankhya.modelcore.MGEModelException;
+import br.com.sankhya.modelcore.auth.AuthenticationInfo;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
+import br.com.sankhya.modelcore.util.SPBeanUtils;
+import br.com.sankhya.ws.ServiceContext;
+import org.jdom.Element;
 import org.json.JSONObject;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -70,6 +77,19 @@ public class JapeHelper {
             throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
         } finally {
             JapeSession.close(hnd);
+        }
+    }
+
+    private static DynamicVO createNewLine(String instance, DynamicVO vo) throws MGEModelException {
+
+        JapeHelper.setSessionProperties();
+        try {
+            EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+            PersistentLocalEntity entity = dwfFacade.createEntity(instance, (EntityVO) vo);
+
+            return (DynamicVO) entity.getValueObject();
+        } catch (Exception e) {
+            throw new MGEModelException("createNewLine Error:" + e.getMessage());
         }
     }
 
@@ -396,9 +416,28 @@ public class JapeHelper {
         }
     }
 
+    private static void setSessionProperties() {
+        AuthenticationInfo auth = new AuthenticationInfo("SUP", BigDecimal.ZERO, BigDecimal.ZERO, 1);
+        auth.makeCurrent();
+
+        ServiceContext sctx = new ServiceContext(null);
+        sctx.setAutentication(AuthenticationInfo.getCurrent());
+        Element bodyElem = new Element("serviceRequest");
+        Element requestBody = new Element("requestBody");
+        bodyElem.addContent(requestBody);
+        sctx.setRequestBody(bodyElem);
+        sctx.makeCurrent();
+        try {
+            SPBeanUtils.setupContext(sctx);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static class CreateNewLine {
         private String instance;
         private HashMap<String, Object> values = new HashMap<>();
+        private DynamicVO vo;
 
         public CreateNewLine(String instance) {
             this.instance = instance;
@@ -406,6 +445,14 @@ public class JapeHelper {
 
         public DynamicVO save() throws MGEModelException {
             return createNewLine(values, instance);
+        }
+
+        public DynamicVO saveVO() throws MGEModelException {
+            return createNewLine(instance, this.vo);
+        }
+
+        public void setVO(DynamicVO vo) {
+            this.vo = vo;
         }
 
         public void set(String label, Object value) {
