@@ -66,7 +66,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.DevSankhya:snk-wrapper:1.1.1")
+    implementation("com.github.DevSankhya:snk-wrapper:1.1.2")
 //
 //    implementation("br.com.sankhya", "mge-modelcore", skwVersion)
 //    implementation("br.com.sankhya", "jape", skwVersion)
