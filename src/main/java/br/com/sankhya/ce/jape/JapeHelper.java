@@ -129,7 +129,7 @@ public class JapeHelper {
             RunQuery runQuery = new RunQuery(select, (nativeSql -> {
                 values.values().forEach(nativeSql::addParameter);
                 return nativeSql;
-            }), false);
+            }));
 
             List<JSONObject> results = runQuery.toList();
 

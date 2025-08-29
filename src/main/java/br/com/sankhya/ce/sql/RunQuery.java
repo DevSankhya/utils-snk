@@ -23,36 +23,45 @@ import java.util.function.Function;
 
 @SuppressWarnings({"unused"})
 public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
-    private final JdbcWrapper jdbc;
+    private JdbcWrapper jdbc;
+    private final String query;
     private NativeSql sql;
+
+    private Function<NativeSql, NativeSql> callBack = (n) -> n;
+
     private final JapeSession.SessionHandle hnd = buildtHnd();
     private ResultSet resultSet = null;
     private boolean status;
     private boolean internalTransaction = true;
 
-    public boolean isStatus() {
-        return status;
-    }
-
-    public void setStatus(boolean status) {
-        this.status = status;
-    }
-
-    public static Function<NativeSql, NativeSql> QueryCallback = n -> n;
 
     public RunQuery(String query) {
         try {
-            hnd.setFindersMaxRows(-1);
-            EntityFacade entity = EntityFacadeFactory.getDWFFacade();
-            jdbc = entity.getJdbcWrapper();
-            jdbc.openSession();
-            sql = new NativeSql(jdbc);
-            sql.appendSql(query);
-            resultSet = sql.executeQuery();
-            status = true;
+            this.query = query;
         } catch (Exception e) {
             throw new RuntimeException("Error during query execution: " + e.getMessage());
         }
+    }
+
+    public RunQuery(String query, Function<NativeSql, NativeSql> callBack) {
+        try {
+            this.query = query;
+            this.callBack = callBack;
+        } catch (Exception e) {
+            throw new RuntimeException("Error during query execution: " + e.getMessage());
+        }
+    }
+
+    public boolean isOk() {
+        return status;
+    }
+
+    public JapeSession.SessionHandle getHnd() {
+        return hnd;
+    }
+
+    public void setCallBack(Function<NativeSql, NativeSql> callBack) {
+        this.callBack = callBack;
     }
 
 
@@ -66,7 +75,16 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         } else return JapeSession.open();
     }
 
-    public RunQuery(String query, Function<NativeSql, NativeSql> callBack, boolean update) {
+
+    private NativeSql runCallBack(NativeSql sql) {
+        if (callBack != null) {
+            return callBack.apply(sql);
+        }
+        return sql;
+    }
+
+
+    public void execute() {
         try {
             hnd.setFindersMaxRows(-1);
             EntityFacade entity = EntityFacadeFactory.getDWFFacade();
@@ -74,39 +92,106 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
             jdbc.openSession();
             sql = new NativeSql(jdbc);
             sql.appendSql(query);
-            if (callBack != null) {
-                sql = callBack.apply(sql);
-            }
-            if (!update) {
+
+            sql = runCallBack(sql);
+
+            SqlCommandType type = getSqlCommandType(query);
+            if (canUseExecuteQuery(type)) {
                 resultSet = sql.executeQuery();
                 status = true;
-            } else {
+            } else if (canUseExecuteUpdate(type)) {
                 status = sql.executeUpdate();
-                close();
+            } else {
+                throw new Exception("Unknow command");
             }
+
         } catch (Exception e) {
             throw new RuntimeException("Error during query execution: " + e.getMessage());
         }
     }
 
-    public RunQuery(String query, boolean update) {
-        try {
-            hnd.setFindersMaxRows(-1);
-            EntityFacade entity = EntityFacadeFactory.getDWFFacade();
-            jdbc = entity.getJdbcWrapper();
-            jdbc.openSession();
-            sql = new NativeSql(jdbc);
-            sql.appendSql(query);
-            if (!update) {
-                resultSet = sql.executeQuery();
-                status = true;
-            } else {
-                status = sql.executeUpdate();
-                close();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Error during query execution: " + e.getMessage());
+
+    public boolean canUseExecuteQuery(SqlCommandType type) {
+        return type == SqlCommandType.SELECT;
+    }
+
+    public boolean canUseExecuteUpdate(SqlCommandType type) {
+        switch (type) {
+            case INSERT:
+            case UPDATE:
+            case DELETE:
+            case MERGE:
+            case CREATE:
+            case DROP:
+            case ALTER:
+                return true;
+            default:
+                return false;
         }
+    }
+
+    public enum SqlCommandType {
+        SELECT,
+        INSERT,
+        UPDATE,
+        DELETE,
+        MERGE,
+        CREATE,
+        DROP,
+        ALTER,
+        SHOW,
+        DESCRIBE,
+        EXPLAIN,
+        UNKNOWN
+    }
+
+    public static SqlCommandType getSqlCommandType(String sql) {
+        if (sql == null || sql.trim().isEmpty()) {
+            return SqlCommandType.UNKNOWN;
+        }
+
+        // Remove comentários do início (-- ou /* */)
+        String cleaned = removeLeadingComments(sql).trim().toUpperCase();
+
+        // Se vazio depois de limpar
+        if (cleaned.isEmpty()) {
+            return SqlCommandType.UNKNOWN;
+        }
+
+        // Pega a primeira palavra
+        String firstWord = cleaned.split("\\s+")[0];
+
+        // Tratar casos especiais que levam a SELECT
+        if (firstWord.equals("WITH") || firstWord.equals("EXPLAIN")
+            || firstWord.equals("SHOW") || firstWord.equals("DESCRIBE")) {
+            return SqlCommandType.SELECT;
+        }
+
+        try {
+            return SqlCommandType.valueOf(firstWord);
+        } catch (IllegalArgumentException e) {
+            return SqlCommandType.UNKNOWN;
+        }
+    }
+
+    private static String removeLeadingComments(String sql) {
+        String result = sql.trim();
+
+        // Remove comentários do tipo --
+        while (result.startsWith("--")) {
+            int newLine = result.indexOf("\n");
+            if (newLine == -1) return "";
+            result = result.substring(newLine + 1).trim();
+        }
+
+        // Remove comentários do tipo /* */
+        while (result.startsWith("/*")) {
+            int endComment = result.indexOf("*/");
+            if (endComment == -1) return "";
+            result = result.substring(endComment + 2).trim();
+        }
+
+        return result;
     }
 
     public List<JSONObject> toList() throws SQLException {
