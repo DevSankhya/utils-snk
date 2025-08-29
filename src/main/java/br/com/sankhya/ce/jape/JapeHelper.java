@@ -234,7 +234,7 @@ public class JapeHelper {
     }
 
 
-    private static ResolveSqlTypes.Database getDialect() {
+    public static ResolveSqlTypes.Database getDialect() {
         EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
         JdbcWrapper jdbcWrapper = dwfFacade.getJdbcWrapper();
         String databaseProductName = "unknown";
