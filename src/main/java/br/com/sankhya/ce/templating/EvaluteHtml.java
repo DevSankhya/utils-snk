@@ -1,16 +1,16 @@
 package br.com.sankhya.ce.templating;
 
 import br.com.sankhya.ce.tuples.Pair;
-//import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 import javax.script.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -18,14 +18,15 @@ import java.io.InputStream;
 
 public class EvaluteHtml {
 
-    private final String regex = "<script #(?:\\s*(?:[\\s \"=A-Za-z0-9_@.\\/#&+-]*\\s*)?>|>)((.|\\n)*?)<\\/script>$";
-    private final Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
+    final String regex = "<script (@Server)(?:\\s+(?:[\\s \"=A-Za-z0-9_@.\\/#&+-]*\\s*)?>|>)((?:.|\\n)*?)<\\/script>$";
     private final ScriptEngine engine = new ScriptEngineManager().getEngineByName("js");
     private final String globalVaribleName = "$this";
     private final String engineName = engine.getFactory().getEngineName();
 
     public EvaluteHtml() {
-        engine.put(globalVaribleName, new EvaluateIntern(engine));
+        engine.put(globalVaribleName, this);
+
+        this.evalJsVoid("/templating/pollyfill.js");
     }
 
     private String getContentFromResource(Class<?> baseClass, String resourcePath) throws Exception {
@@ -43,46 +44,57 @@ public class EvaluteHtml {
         return getContentFromResource(Class.forName(Thread.currentThread().getStackTrace()[2].getClassName()), resourcePath);
     }
 
-    private boolean isValidPath(String path) {
+    private String getSource(String str) {
         try {
-            Paths.get(path);
-        } catch (InvalidPathException | NullPointerException ex) {
-            return false;
+            Paths.get(str); // Check if is a valid path
+            return loadResource(str);
+        } catch (Exception ex) {
+            return str;
         }
-        return true;
     }
 
-    private String evalute(String source) {
-        String htmlRet = source;
-        if (isValidPath(source)) {
+    private Optional<String> evalute(String source) {
+        String htmlRet = getSource(source);
+
+
+        final Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
+        final Matcher matcher = pattern.matcher(htmlRet);
+
+        while (matcher.find()) {
+            String type = matcher.group(1);
+            String script = matcher.group(2);
+
+            if ("@Server".equals(type)) { // Processa o script, mas não retorna nada
+                this.evalJsVoid(script);
+                htmlRet = htmlRet.replace(matcher.group(0), "");
+            }
+        }
+
+        final String regexVar = "<%=((?:.|\\n)*?)%>$";
+
+        final Pattern patternVar = Pattern.compile(regexVar, Pattern.MULTILINE);
+        final Matcher matcherVar = patternVar.matcher(htmlRet);
+
+        while (matcherVar.find()) {
+            String script = matcherVar.group(1);
             try {
-                htmlRet = loadResource(source);
-            } catch (Exception e) {
+                Object res = engine.eval(script);
+
+                if (res == null) res = "null";
+
+                htmlRet = htmlRet.replace(matcherVar.group(0), res.toString());
+            } catch (ScriptException e) {
                 throw new RuntimeException(e);
             }
         }
-
-        Matcher matcher = pattern.matcher(htmlRet);
-        while (matcher.find()) {
-            for (int i = 1; i <= matcher.groupCount(); i++) {
-                String value = matcher.group(1);
-                try {
-                    Object res = engine.eval(value);
-                    htmlRet = htmlRet.replace(matcher.group(0), res.toString());
-                } catch (ScriptException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
-
-        return htmlRet.trim();
+        return Optional.of(htmlRet.trim());
     }
 
-    private String evaluteJs(String js) {
+    @SuppressWarnings("unchecked")
+    private <T> T evaluteJs(String js) {
         if (js == null) return null;
         try {
-            Object res = engine.eval(js);
-            return res != null ? res.toString().trim() : null;
+            return (T) engine.eval(js);
         } catch (ScriptException e) {
             throw new RuntimeException(e);
         }
@@ -92,98 +104,92 @@ public class EvaluteHtml {
     public final String eval(String html, Pair<String, Object>... args) {
         for (Pair<String, Object> pair : args) {
             String name = pair.getLeft();
-            Object value = pair.getRight();
-
-            if (value instanceof BigDecimal) {
-                value = ((BigDecimal) value).doubleValue();
-            }
-            if (value instanceof EvaluteHtml) {
-                throw new IllegalArgumentException("Não é possivel passar um objeto EvaluteHtml");
-            }
-            if (value instanceof Collection<?> || value != null && value.getClass().isArray()) {
-                if (value.getClass().isArray()) {
-                    value = java.util.Arrays.asList((Object[]) value);
-                }
-                engine.put(name, value);
-                try {
-                    value = engine.eval("eval(\"\"+" + name + ")");
-                } catch (ScriptException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-
+            Object value = toJsValue(name, pair.getRight());
             engine.put(name, value);
         }
 
-        engine.put(globalVaribleName, new EvaluateIntern(engine));
-        return evalute(html).replace("\n", "");
+        engine.put(globalVaribleName, this);
+        Optional<String> evalute = evalute(html);
+        return evalute.map(s -> s.replace("\n", " ")).orElse("");
+
     }
 
-    @SafeVarargs
-    public final String evalJs(String js, Pair<String, Object>... args) {
-        for (Pair<String, Object> pair : args) {
-            String name = pair.getLeft();
-            Object value = pair.getRight();
+    private Object toJsValue(String name, Object value) {
+        try {
+            if (value == null) {
+                return null;
+            }
 
             if (value instanceof BigDecimal) {
-                value = ((BigDecimal) value).doubleValue();
-            }
-            if (value instanceof EvaluteHtml) {
-                throw new IllegalArgumentException("Não é possivel passar um objeto EvaluteHtml");
-            }
-            if (value instanceof Collection<?> || value != null && value.getClass().isArray()) {
-                if (value.getClass().isArray()) {
-                    value = java.util.Arrays.asList((Object[]) value);
-                }
-                engine.put(name, value);
-                try {
-                    value = engine.eval("eval(\"\"+" + name + ")");
-                } catch (ScriptException e) {
-                    throw new RuntimeException(e);
-                }
+                return ((BigDecimal) value).doubleValue();
             }
 
+            if (value instanceof EvaluteHtml) {
+                throw new IllegalArgumentException("Não é possível passar um objeto EvaluteHtml");
+            }
+
+            engine.put(name, value); // primeiro coloca no engine
+
+            if (value instanceof Collection<?> || value.getClass().isArray()) {
+                if (value.getClass().isArray()) {
+                    // converte array Java para List temporariamente
+                    value = java.util.Arrays.asList((Object[]) value);
+                    engine.put(name, value);
+                }
+                return engine.eval("Java.from(" + name + ")");
+            }
+
+            if (value instanceof Map<?, ?>) {
+                return engine.eval("Object.from(" + name + ")");
+            }
+
+            return value; // tipos primitivos e String já funcionam
+        } catch (ScriptException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * @param js   Source of js code(Can be plain or a path to a file)
+     * @param args Arguments to be passed to the js code
+     * @return The result of the js code
+     */
+    @SafeVarargs
+    public final <T> T evalJs(String js, Pair<String, Object>... args) {
+
+        js = getSource(js);
+
+        for (Pair<String, Object> pair : args) {
+            String name = pair.getLeft();
+            Object value = toJsValue(name, pair.getRight());
             engine.put(name, value);
         }
+        engine.put(globalVaribleName, this);
 
-        engine.put(globalVaribleName, new EvaluateIntern(engine));
-        String value = evaluteJs(js);
-        return value != null ? value.replace("\n", "") : null;
+        return evaluteJs(js);
+    }
+
+    /**
+     * @param js   Source of js code(Can be plain or a path to a file)
+     * @param args Arguments to be passed to the js code
+     */
+    @SafeVarargs
+    public final void evalJsVoid(String js, Pair<String, Object>... args) {
+
+        js = getSource(js);
+
+        for (Pair<String, Object> pair : args) {
+            String name = pair.getLeft();
+            Object value = toJsValue(name, pair.getRight());
+            engine.put(name, value);
+        }
+        engine.put(globalVaribleName, this);
+
+        evaluteJs(js);
     }
 
     public String getEngineName() {
         return engineName;
     }
 
-    public static class EvaluateIntern {
-        private final ScriptEngine engine;
-
-        public EvaluateIntern(ScriptEngine engine) {
-            this.engine = engine;
-        }
-
-        public Object eval(String js) {
-            try {
-                return engine.eval(js);
-            } catch (ScriptException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-//        public ScriptObjectMirror getArgs() {
-//            Bindings variables = engine.getBindings(ScriptContext.ENGINE_SCOPE);
-//            ScriptEngine newEngine = new ScriptEngineManager().getEngineByName("js");
-//            try {
-//                ScriptObjectMirror obj = (ScriptObjectMirror) newEngine.eval("({})");
-//                obj.putAll(variables);
-//                return obj;
-//            } catch (ScriptException e) {
-//                throw new RuntimeException(e);
-//            }
-//        }
-
-        public Object get(String name) {
-            return engine.get(name);
-        }
-    }
 }
