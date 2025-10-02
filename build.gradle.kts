@@ -66,19 +66,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.DevSankhya:snk-wrapper:1.1.2")
-//
-//    implementation("br.com.sankhya", "mge-modelcore", skwVersion)
-//    implementation("br.com.sankhya", "jape", skwVersion)
-//    implementation("br.com.sankhya", "dwf", skwVersion)
-//    implementation("br.com.sankhya", "sanws", skwVersion)
-//    implementation("br.com.sankhya", "mge-param", skwVersion)
-//    implementation("br.com.sankhya", "skw-environment", skwVersion)
-//    implementation("br.com.sankhya", "sanutil", skwVersion)
-//    implementation("br.com.sankhya", "cuckoo", skwVersion)
-//    implementation("br.com.sankhya", "mgecom-model", skwVersion)
-//    implementation("br.com.sankhya", "mgefin-model", skwVersion)
-//    implementation("org.json", "json", "20240303")
+    compileOnly("com.github.DevSankhya:snk-wrapper:1.1.4")
 
     // Status HTTP / Apoio as Servlets
     implementation("com.squareup.okhttp3:okhttp:3.9.0")
@@ -87,11 +75,11 @@ dependencies {
     implementation("org.jetbrains:annotations:24.0.0")
 
     // Manipulador de JSON
-    implementation("com.google.code.gson", "gson", "2.1")
+    compileOnly("com.google.code.gson", "gson", "2.1")
 
     // EJB / Escrever no container wildfly
-    implementation("org.wildfly:wildfly-spec-api:16.0.0.Final")
-    implementation("org.jdom", "jdom", "1.1.3")
+    compileOnly("org.wildfly:wildfly-spec-api:16.0.0.Final")
+    compileOnly("org.jdom", "jdom", "1.1.3")
 //    implementation("com.oracle.database.jdbc:ojdbc8:19.11.0.0")
 }
 

@@ -18,7 +18,9 @@ import java.io.InputStream;
 
 public class EvaluteHtml {
 
-    final String regex = "<script (@Server)(?:\\s+(?:[\\s \"=A-Za-z0-9_@.\\/#&+-]*\\s*)?>|>)((?:.|\\n)*?)<\\/script>$";
+    final String regexScriptTag = "<script (@Server)(?:\\s+(?:[\\s \"=A-Za-z0-9_@.\\/#&+-]*\\s*)?>|>)((?:.|\\n)*?)<\\/script>$";
+    final Pattern patternScriptTag = Pattern.compile(regexScriptTag, Pattern.MULTILINE);
+    final Pattern patternVar = Pattern.compile("<%=((?:.|\\n)*?)%>$", Pattern.MULTILINE);
     private final ScriptEngine engine = new ScriptEngineManager().getEngineByName("js");
     private final String globalVaribleName = "$this";
     private final String engineName = engine.getFactory().getEngineName();
@@ -57,8 +59,7 @@ public class EvaluteHtml {
         String htmlRet = getSource(source);
 
 
-        final Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
-        final Matcher matcher = pattern.matcher(htmlRet);
+        final Matcher matcher = patternScriptTag.matcher(htmlRet);
 
         while (matcher.find()) {
             String type = matcher.group(1);
@@ -70,9 +71,7 @@ public class EvaluteHtml {
             }
         }
 
-        final String regexVar = "<%=((?:.|\\n)*?)%>$";
 
-        final Pattern patternVar = Pattern.compile(regexVar, Pattern.MULTILINE);
         final Matcher matcherVar = patternVar.matcher(htmlRet);
 
         while (matcherVar.find()) {
