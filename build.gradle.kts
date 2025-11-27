@@ -4,7 +4,6 @@ plugins {
     id("java")
     id("application")
     `maven-publish`
-
 }
 
 val skwVersion = "master"

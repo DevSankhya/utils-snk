@@ -3,22 +3,14 @@ package br.com.sankhya.ce.sql;
 import br.com.sankhya.jape.EntityFacade;
 import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.JdbcWrapper;
-import br.com.sankhya.jape.event.TransactionContext;
 import br.com.sankhya.jape.sql.NativeSql;
-import br.com.sankhya.jape.util.JapeSessionContext;
-import br.com.sankhya.jape.wrapper.JapeFactory;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Spliterator;
-import java.util.function.Consumer;
+import java.util.*;
 import java.util.function.Function;
 
 @SuppressWarnings({"unused"})
@@ -26,30 +18,23 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     private JdbcWrapper jdbc;
     private final String query;
     private NativeSql sql;
+    private final Map<Object, Object> params = new LinkedHashMap<>();
+    private Function<NativeSql, NativeSql> callBack = Function.identity();
+    private int lastId = -1;
 
-    private Function<NativeSql, NativeSql> callBack = (n) -> n;
 
-    private final JapeSession.SessionHandle hnd = buildtHnd();
-    private ResultSet resultSet = null;
+    private final JapeSession.SessionHandle hnd = buildHnd();
+    private ResultSet resultSet;
     private boolean status;
     private boolean internalTransaction = true;
 
-
     public RunQuery(String query) {
-        try {
-            this.query = query;
-        } catch (Exception e) {
-            throw new RuntimeException("Error during query execution: " + e.getMessage());
-        }
+        this.query = query;
     }
 
     public RunQuery(String query, Function<NativeSql, NativeSql> callBack) {
-        try {
-            this.query = query;
-            this.callBack = callBack;
-        } catch (Exception e) {
-            throw new RuntimeException("Error during query execution: " + e.getMessage());
-        }
+        this.query = query;
+        this.callBack = callBack;
     }
 
     public boolean isOk() {
@@ -64,50 +49,63 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         this.callBack = callBack;
     }
 
-
-    public JapeSession.SessionHandle buildtHnd() {
+    private JapeSession.SessionHandle buildHnd() {
         boolean hasCurrentSession = JapeSession.hasCurrentSession();
-        boolean hasTransaction = false;
-        if (hasCurrentSession) hasTransaction = JapeSession.getCurrentSession().hasTransaction();
+        boolean hasTransaction = hasCurrentSession && JapeSession.getCurrentSession().hasTransaction();
         if (hasCurrentSession && hasTransaction) {
             this.internalTransaction = false;
             return JapeSession.getCurrentSession().getTopMostHandle();
-        } else return JapeSession.open();
-    }
-
-
-    private NativeSql runCallBack(NativeSql sql) {
-        if (callBack != null) {
-            return callBack.apply(sql);
         }
-        return sql;
+        return JapeSession.open();
     }
 
+    public void setParameter(Object value) {
+        params.put(++lastId, value);
+    }
 
-    public void execute() {
-        try {
-            hnd.setFindersMaxRows(-1);
-            EntityFacade entity = EntityFacadeFactory.getDWFFacade();
-            jdbc = entity.getJdbcWrapper();
-            jdbc.openSession();
-            sql = new NativeSql(jdbc);
-            sql.appendSql(query);
+    public void setParameter(String name, Object value) {
+        params.put(name, value);
+    }
 
-            sql = runCallBack(sql);
+    public ResultSet getResultSet() {
+        return resultSet;
+    }
 
-            SqlCommandType type = getSqlCommandType(query);
-            if (canUseExecuteQuery(type)) {
-                resultSet = sql.executeQuery();
-                status = true;
-            } else if (canUseExecuteUpdate(type)) {
-                status = sql.executeUpdate();
-            } else {
-                throw new Exception("Unknow command");
+    public void execute() throws Exception {
+        JapeSession.execEnsuringTX(() -> {
+            try {
+                hnd.setFindersMaxRows(-1);
+                EntityFacade entity = EntityFacadeFactory.getDWFFacade();
+                jdbc = entity.getJdbcWrapper();
+                jdbc.openSession();
+                sql = new NativeSql(jdbc).appendSql(query);
+
+                for (Map.Entry<Object, Object> objectObjectEntry : params.entrySet()) {
+                    Object key = objectObjectEntry.getKey();
+                    if (key instanceof Number) {
+                        sql.setParameter(((Number) key).intValue(), objectObjectEntry.getValue());
+                        continue;
+                    }
+                    if (key instanceof String) {
+                        sql.setNamedParameter((String) key, objectObjectEntry.getValue());
+                    }
+                }
+
+                sql = callBack.apply(sql);
+
+                SqlCommandType type = getSqlCommandType(query);
+                if (canUseExecuteQuery(type)) {
+                    resultSet = sql.executeQuery();
+                    status = true;
+                } else if (canUseExecuteUpdate(type)) {
+                    status = sql.executeUpdate();
+                } else {
+                    throw new IllegalArgumentException("Unknown SQL command: " + query);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error during query execution: " + e.getMessage(), e);
             }
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error during query execution: " + e.getMessage());
-        }
+        });
     }
 
 
@@ -194,52 +192,72 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         return result;
     }
 
-    public List<JSONObject> toList() throws SQLException {
-        List<JSONObject> json = new ArrayList<>();
+    public List<Map<String, Object>> toList() throws SQLException {
+        List<Map<String, Object>> result = new ArrayList<>();
         ResultSetMetaData rsmd = getMetaData();
-        if (rsmd == null) return json;
+        if (rsmd == null) return result;
+
+        this.forEach((RowConsumer<Map<String, Object>>) (row) -> {
+            return RowConsumer.Action.CONTINUE;
+        });
         forEach(row -> {
-            int numColumns;
             try {
-                numColumns = rsmd.getColumnCount();
+                result.add(toMap(row));
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-            JSONObject obj = new JSONObject();
-            for (int i = 1; i <= numColumns; i++) {
-                String columnName;
-                try {
-                    columnName = rsmd.getColumnName(i);
-                    obj.put(columnName, row.getObject(columnName));
-                    json.add(obj);
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
         });
-        return json;
+        return result;
+    }
+
+    public void forEach(RowConsumer<Map<String, Object>> action) throws SQLException {
+        while (resultSet.next()) {
+            Map<String, Object> row = toMap(resultSet);
+            RowConsumer.Action result = action.accept(row);
+            if (result == RowConsumer.Action.CONTINUE) continue;
+            if (result == RowConsumer.Action.BREAK) break;
+        }
+    }
+
+    private Map<String, Object> toMap(ResultSet rs) throws SQLException {
+        Map<String, Object> row = new LinkedHashMap<>();
+        ResultSetMetaData rsmd = rs.getMetaData();
+        int numColumns = rsmd.getColumnCount();
+        for (int i = 1; i <= numColumns; i++) {
+            String columnName = rsmd.getColumnName(i);
+            row.put(columnName, rs.getObject(columnName));
+        }
+        return row;
+    }
+
+
+    public interface RowConsumer<T> {
+        enum Action {CONTINUE, BREAK}
+
+        Action accept(T value) throws SQLException;
     }
 
     public ResultSetMetaData getMetaData() throws SQLException {
         return resultSet != null ? resultSet.getMetaData() : null;
     }
 
-    /**
-     * Closes the database connection and clears the ResultSet data
-     */
+    @Override
     public void close() {
-//        if (resultSet != null) closeResultSet(resultSet);
-        if (sql != null) NativeSql.releaseResources(sql);
-        if (jdbc != null) JdbcWrapper.closeSession(jdbc);
-
-        if (internalTransaction)
-            JapeSession.close(hnd);
-    }
-
-    private static void closeResultSet(ResultSet rset) {
-        if (rset != null) {
+        try {
+            if (resultSet != null) resultSet.close();
+        } catch (Exception ignored) {
+        }
+        try {
+            if (sql != null) NativeSql.releaseResources(sql);
+        } catch (Exception ignored) {
+        }
+        try {
+            if (jdbc != null) JdbcWrapper.closeSession(jdbc);
+        } catch (Exception ignored) {
+        }
+        if (internalTransaction) {
             try {
-                rset.close();
+                JapeSession.close(hnd);
             } catch (Exception ignored) {
             }
         }
@@ -248,37 +266,29 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     @Override
     public @NotNull Iterator<ResultSet> iterator() {
         return new Iterator<ResultSet>() {
-            private boolean hasNext = advance();
-
-            private boolean advance() {
-                try {
-                    return resultSet != null && resultSet.next();
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+            private boolean hasNextChecked = false;
+            private boolean hasNext = false;
 
             @Override
             public boolean hasNext() {
+                if (!hasNextChecked) {
+                    try {
+                        hasNext = resultSet != null && resultSet.next();
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                    hasNextChecked = true;
+                }
                 return hasNext;
             }
 
             @Override
             public ResultSet next() {
-                if (!hasNext) {
-                    throw new IllegalStateException("No more rows available.");
-                }
-                ResultSet current = resultSet;
-                hasNext = advance(); // move para o próximo registro
-                return current;
+                if (!hasNext()) throw new NoSuchElementException("No more rows available.");
+                hasNextChecked = false;
+                return resultSet;
             }
         };
-    }
-
-
-    @Override
-    public Spliterator<ResultSet> spliterator() {
-        return Iterable.super.spliterator();
     }
 }
 
