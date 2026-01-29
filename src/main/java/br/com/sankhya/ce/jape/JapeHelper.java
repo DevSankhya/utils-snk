@@ -19,10 +19,63 @@ import br.com.sankhya.ws.ServiceContext;
 import org.jdom.Element;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 @SuppressWarnings({"unused"})
 public class JapeHelper {
+
+
+    public static class SessionManager {
+        private boolean internalTransaction = true;
+        private JapeSession.SessionHandle hnd;
+
+        public SessionManager() {
+            hnd = open();
+        }
+
+        public JapeSession.SessionHandle open() {
+            JapeSession.SessionHandle hnd;
+            boolean hasCurrentSession = JapeSession.hasCurrentSession();
+            boolean hasTransaction = false;
+            if (hasCurrentSession) hasTransaction = JapeSession.getCurrentSession().hasTransaction();
+            if (hasCurrentSession && hasTransaction) {
+                this.internalTransaction = false;
+                hnd = JapeSession.getCurrentSession().getTopMostHandle();
+            } else hnd = JapeSession.open();
+            this.hnd = hnd;
+            return hnd;
+        }
+
+        public void canTimeout(boolean canTimeout) {
+            this.hnd.setCanTimeout(canTimeout);
+            this.hnd.setSessionTimeout(Long.MAX_VALUE);
+        }
+
+        public void close() {
+            if (!this.internalTransaction) // N?o fecha a conex?o se ela n?o pertence a instancia desta, pois esta aproveita a conex?o externa
+                return;
+
+            JapeHelper.closeHnd(hnd);
+        }
+
+        public void close(JapeSession.SessionHandle hnd) {
+            if (!this.internalTransaction) // N?o fecha a conex?o se ela n?o pertence a instancia desta, pois esta aproveita a conex?o externa
+                return;
+
+            JapeHelper.closeHnd(hnd);
+        }
+    }
+
+    public static void closeHnd(JapeSession.SessionHandle hnd) {
+        boolean hasCurrentSession = JapeSession.hasCurrentSession();
+        boolean hasTransaction = false;
+        if (hasCurrentSession) hasTransaction = JapeSession.getCurrentSession().hasTransaction();
+
+        if (hnd != null && hasTransaction) JapeSession.close(hnd);
+    }
+
     /**
      * Método para criar um novo registro na instância informada.
      *
@@ -329,6 +382,13 @@ public class JapeHelper {
         } finally {
             JapeSession.close(hnd);
         }
+    }
+
+    public static DynamicVO updateVO(String instance, DynamicVO vo) throws Exception {
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
+
+        return (DynamicVO) entity.getValueObject();
     }
 
     /**

@@ -3,6 +3,7 @@ package br.com.sankhya.ce.data;
 import br.com.sankhya.ce.tuples.Pair;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.text.*;
 import java.time.LocalDate;
@@ -103,6 +104,75 @@ public class ConvertHelper {
         LocalDate dateObj = LocalDate.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         return Pair.of(new Timestamp(System.currentTimeMillis()), dateObj.format(formatter));
+    }
+
+
+    /**
+     * Converte um {@code Number} para {@code BigDecimal}
+     *
+     * @param number
+     * @return [BigDecimal]
+     */
+    public static BigDecimal toBigDecimal(Number number) {
+        if (number == null) return null;
+
+        if (number instanceof BigDecimal) {
+            return (BigDecimal) number;
+        }
+        if (number instanceof BigInteger) {
+            return new BigDecimal((BigInteger) number);
+        }
+        if (number instanceof Long || number instanceof Integer
+            || number instanceof Short || number instanceof Byte) {
+            return BigDecimal.valueOf(number.longValue());
+        }
+        if (number instanceof Float || number instanceof Double) {
+            return BigDecimal.valueOf(number.doubleValue()); // evita perda de precisão
+        }
+
+        // fallback (não recomendado, mas funciona em casos genéricos)
+        return tryBigDecimal(number);
+    }
+
+    /**
+     * Converte um {@code Number} para {@code BigDecimal}. Retorna BigDecimal.ZERO caso seja nulo
+     *
+     * @param number
+     * @return [BigDecimal]
+     */
+    public static BigDecimal toBigDecimalOrZero(Number number) {
+        if (number == null) return BigDecimal.ZERO;
+
+        if (number instanceof BigDecimal) {
+            return (BigDecimal) number;
+        }
+        if (number instanceof BigInteger) {
+            return new BigDecimal((BigInteger) number);
+        }
+        if (number instanceof Long || number instanceof Integer
+            || number instanceof Short || number instanceof Byte) {
+            return BigDecimal.valueOf(number.longValue());
+        }
+        if (number instanceof Float || number instanceof Double) {
+            return BigDecimal.valueOf(number.doubleValue()); // evita perda de precisão
+        }
+
+        // fallback (não recomendado, mas funciona em casos genéricos)
+        BigDecimal result = tryBigDecimal(number);
+
+        if (result == null)
+            return BigDecimal.ZERO;
+
+        return result;
+    }
+
+    private static BigDecimal tryBigDecimal(Object value) {
+        try {
+            return new BigDecimal(value.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 }

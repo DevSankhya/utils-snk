@@ -1,5 +1,7 @@
 package br.com.sankhya.ce.concurrent;
 
+import br.com.sankhya.jape.core.JapeSession;
+import br.com.sankhya.modelcore.util.AsyncAction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -133,5 +135,35 @@ public class Async {
             i += chunkSize;
         }
         return chunks;
+    }
+
+
+    public static void async(
+        String name, // Nome da tasnk
+        String domain, // Dominio da task(Pode ser qualquer coisa at� onde sei, mas � para ser um string sem espa�os como um ID. Syspdv usa "dvc" por exemplo)
+        Runnable body // C�digo que vai ser executado no AsyncAction
+    ) {
+        AsyncAction.AsyncTask task = new AsyncAction.AsyncTask(name, true, true);
+        task.setTaskBody(() -> {
+            JapeSession.SessionHandle hnd = null;
+            try {
+                // Abre uma sess�o(N�o significa que vai abrir uma transa��o
+                hnd = JapeSession.open();
+                // Garante que vai ter transa��o ativa(Abre uma nova se n�o existir ou usa a correte se existir)
+                hnd.execEnsuringTX(() -> {
+                    body.run();
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (hnd != null)
+                    JapeSession.close(hnd);
+            }
+        });
+        try {
+            AsyncAction.addTask(domain, task); // Adiciona a task a fila de execu��o
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

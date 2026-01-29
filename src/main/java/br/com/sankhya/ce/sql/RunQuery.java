@@ -6,6 +6,7 @@ import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.sql.NativeSql;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONObject;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -108,7 +109,6 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         });
     }
 
-
     public boolean canUseExecuteQuery(SqlCommandType type) {
         return type == SqlCommandType.SELECT;
     }
@@ -193,21 +193,28 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     }
 
     public List<Map<String, Object>> toList() throws SQLException {
-        List<Map<String, Object>> result = new ArrayList<>();
+        List<Map<String, Object>> results = new ArrayList<>();
         ResultSetMetaData rsmd = getMetaData();
-        if (rsmd == null) return result;
-
-        this.forEach((RowConsumer<Map<String, Object>>) (row) -> {
-            return RowConsumer.Action.CONTINUE;
-        });
+        if (rsmd == null) return results;
         forEach(row -> {
+            int numColumns;
             try {
-                result.add(toMap(row));
+                numColumns = rsmd.getColumnCount();
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
+            Map<String, Object> obj = new LinkedHashMap<>();
+            for (int i = 1; i <= numColumns; i++) {
+                try {
+                    String columnName = rsmd.getColumnName(i);
+                    obj.put(columnName, row.getObject(columnName));
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            results.add(obj);
         });
-        return result;
+        return results;
     }
 
     public void forEach(RowConsumer<Map<String, Object>> action) throws SQLException {
@@ -219,6 +226,24 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         }
     }
 
+    @FunctionalInterface
+    public interface ThrowingFunction<T, R> {
+        R apply(T t) throws Exception;
+    }
+
+    public <T> Optional<T> getFirst(ThrowingFunction<ResultSet, T> action) {
+        try {
+            if (resultSet == null) return Optional.empty();
+            if (resultSet.next()) {
+                return Optional.of(action.apply(resultSet));
+            }
+            return Optional.empty();
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+
+
+    }
     private Map<String, Object> toMap(ResultSet rs) throws SQLException {
         Map<String, Object> row = new LinkedHashMap<>();
         ResultSetMetaData rsmd = rs.getMetaData();
