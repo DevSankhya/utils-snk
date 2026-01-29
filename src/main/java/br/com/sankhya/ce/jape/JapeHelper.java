@@ -89,7 +89,7 @@ public class JapeHelper {
      * @return String
      * @author Luis Ricardo Alves Santos
      */
-    private static DynamicVO createNewLine(HashMap<String, Object> values, String instance) throws MGEModelException {
+    private static DynamicVO createNewLine(Map<String, Object> values, String instance) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
         StringBuilder listValues = new StringBuilder();
         try {
@@ -111,7 +111,7 @@ public class JapeHelper {
         }
     }
 
-    private static DynamicVO createNewLine(HashMap<String, Object> values, String instance, Boolean repeat) throws MGEModelException {
+    private static DynamicVO createNewLine(Map<String, Object> values, String instance, Boolean repeat) throws MGEModelException {
 
         JapeSession.SessionHandle hnd = null;
         StringBuilder listValues = new StringBuilder();
@@ -369,7 +369,7 @@ public class JapeHelper {
      * @param instance Instância - Default: Instância atual
      * @return DynamicVO
      */
-    public static DynamicVO setCampos(HashMap<String, Object> values, DynamicVO vo, String instance) throws MGEModelException {
+    public static DynamicVO setCampos(Map<String, Object> values, DynamicVO vo, String instance) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
         try {
             hnd = JapeSession.open();
@@ -433,7 +433,7 @@ public class JapeHelper {
      * @param instance Instância - Default: Instância atual
      * @return DynamicVO
      */
-    public static DynamicVO setCampos(HashMap<String, Object> values, String where, String instance) throws MGEModelException {
+    public static DynamicVO setCampos(Map<String, Object> values, String where, String instance) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
         try {
             hnd = JapeSession.open();
@@ -465,7 +465,7 @@ public class JapeHelper {
 
     }
 
-    private static DynamicVO persist(HashMap<String, Object> values, String instance) throws MGEModelException {
+    private static DynamicVO persist(Map<String, Object> values, String instance) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
         StringBuilder listValues = new StringBuilder();
         JapeHelper.setSessionProperties();
@@ -508,7 +508,7 @@ public class JapeHelper {
 
     public static class CreateNewLine {
         private String instance;
-        private HashMap<String, Object> values = new HashMap<>();
+        private Map<String, Object> values = new HashMap<>();
         private DynamicVO vo;
 
         public CreateNewLine(String instance) {
@@ -547,7 +547,7 @@ public class JapeHelper {
 
     public static class PersistLine {
         private String instance;
-        private HashMap<String, Object> values = new HashMap<>();
+        private Map<String, Object> values = new HashMap<>();
         private DynamicVO vo;
         private final Gson gson = new Gson();
 
