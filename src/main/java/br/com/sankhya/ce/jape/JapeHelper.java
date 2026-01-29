@@ -2,11 +2,13 @@ package br.com.sankhya.ce.jape;
 
 import br.com.sankhya.ce.sql.ResolveSqlTypes;
 import br.com.sankhya.jape.EntityFacade;
+import br.com.sankhya.jape.PKNullElementError;
 import br.com.sankhya.jape.bmp.PersistentLocalEntity;
 import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.vo.DynamicVO;
 import br.com.sankhya.jape.vo.EntityVO;
+import br.com.sankhya.jape.vo.VOProperty;
 import br.com.sankhya.jape.wrapper.JapeFactory;
 import br.com.sankhya.jape.wrapper.JapeWrapper;
 import br.com.sankhya.jape.wrapper.fluid.FluidCreateVO;
@@ -16,11 +18,14 @@ import br.com.sankhya.modelcore.auth.AuthenticationInfo;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
 import br.com.sankhya.modelcore.util.SPBeanUtils;
 import br.com.sankhya.ws.ServiceContext;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import org.jdom.Element;
 
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 @SuppressWarnings({"unused"})
@@ -384,6 +389,35 @@ public class JapeHelper {
         }
     }
 
+
+    public static DynamicVO update(Map<String, Object> values, String instance, String where, Object... params) throws MGEModelException {
+        JapeSession.SessionHandle hnd = null;
+        StringBuilder listValues = new StringBuilder();
+        JapeHelper.setSessionProperties();
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, params);
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            DynamicVO fluidGetVO = instanciaDAO.findOne(where);
+
+            JapeWrapper updateDAO = JapeFactory.dao(instance);
+
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                fluidGetVO.setProperty(name, value);
+                listValues.append(name).append("= ").append(value).append("\n");
+            }
+            return JapeHelper.updateVO(instance, fluidGetVO);
+        } catch (Exception e) {
+            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+
     public static DynamicVO updateVO(String instance, DynamicVO vo) throws Exception {
         EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
         PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
@@ -419,6 +453,40 @@ public class JapeHelper {
             JapeSession.close(hnd);
         }
     }
+
+    public static DynamicVO persist(String instance, DynamicVO vo) throws Exception {
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        try {
+            PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
+            return (DynamicVO) entity.getValueObject();
+        } catch (PKNullElementError e) {
+            return createNewLine(instance, vo);
+        }
+
+    }
+
+    private static DynamicVO persist(HashMap<String, Object> values, String instance) throws MGEModelException {
+        JapeSession.SessionHandle hnd = null;
+        StringBuilder listValues = new StringBuilder();
+        JapeHelper.setSessionProperties();
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidCreateVO fluidCreateVO = instanciaDAO.create();
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                fluidCreateVO.set(name, value);
+                listValues.append(name).append("= ").append(value).append("\n");
+            }
+            return fluidCreateVO.save();
+        } catch (Exception e) {
+            throw new MGEModelException("persist Error(" + instance + "):" + e.getMessage() + "\n Values:\n" + listValues);
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
 
     private static void setSessionProperties() {
         AuthenticationInfo auth = new AuthenticationInfo("SUP", BigDecimal.ZERO, BigDecimal.ZERO, 1);
@@ -475,5 +543,86 @@ public class JapeHelper {
             this.instance = instance;
         }
     }
+
+
+    public static class PersistLine {
+        private String instance;
+        private HashMap<String, Object> values = new HashMap<>();
+        private DynamicVO vo;
+        private final Gson gson = new Gson();
+
+        public PersistLine(String instance) {
+            this.instance = instance;
+        }
+
+
+        public DynamicVO persist() throws Exception {
+            if (this.vo != null && vo.getPrimaryKey() != null) return JapeHelper.persist(instance, this.vo);
+            return JapeHelper.persist(values, instance);
+        }
+
+        public void setVO(DynamicVO vo) {
+            this.vo = vo;
+        }
+
+        public DynamicVO updateVO() throws Exception {
+            return JapeHelper.updateVO(instance, this.vo);
+        }
+
+        public DynamicVO update(String where, Object... params) throws MGEModelException {
+            return JapeHelper.update(values, instance, where, params);
+        }
+
+        public PersistLine findOne(String where, Object... params) throws MGEModelException {
+            PersistLine dao = new PersistLine(instance);
+            DynamicVO vo1 = JapeHelper.getVO(instance, where, params);
+            dao.setVO(vo1);
+            return dao;
+        }
+
+        public DynamicVO getVo() {
+            return vo;
+        }
+
+        public String getJson() {
+            if (this.vo != null) return toJson(vo);
+            else return gson.toJson(values);
+        }
+
+        public void set(String label, Object value) {
+            if (this.vo != null) this.vo.setProperty(label, value);
+            values.put(label, value);
+        }
+
+        public void flush() {
+            values = new HashMap<>();
+        }
+
+        public void remove(String label) {
+            values.remove(label);
+        }
+
+        public void setInstance(String instance) {
+            this.instance = instance;
+        }
+
+        private String toJson(DynamicVO vo) {
+            if (vo == null) return null;
+            JsonObject root = new JsonObject();
+            Iterator iterator = vo.iterator();
+            while (iterator.hasNext()) {
+                VOProperty entry = (VOProperty) iterator.next();
+                String name = entry.getName();
+
+                if (isUpperCase(name)) root.addProperty(name, entry.getValue() + "");
+            }
+            return gson.toJson(root);
+        }
+
+        private boolean isUpperCase(String str) {
+            return str.equals(str.toUpperCase());
+        }
+    }
+
 
 }
