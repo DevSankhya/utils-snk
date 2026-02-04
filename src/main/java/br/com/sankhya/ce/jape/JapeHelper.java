@@ -170,6 +170,28 @@ public class JapeHelper {
     }
 
     /**
+     * Retorna o valor de um campo(PK)
+     *
+     * @param name      Nome da propriedade
+     * @param it        DynamicVO do registro
+     * @return [T]
+     */
+    @SuppressWarnings({"unchecked", "unused"})
+    public static <T> T getCampo(String name, DynamicVO it) throws MGEModelException {
+        String instancia = getEntidade(it);
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            DynamicVO fluidGetVO = instanciaDAO.findByPK(it.getPrimaryKey());
+            return (T) fluidGetVO.getProperty(name);
+        } catch (Exception e) {
+            throw new MGEModelException("getCampo Error:" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+    /**
      * Retorna o valor de um campo(Where)
      *
      * @param name      Nome do campo
@@ -290,6 +312,21 @@ public class JapeHelper {
         }
     }
 
+    public static boolean deleteVO(DynamicVO vo) throws MGEModelException {
+        String instance = getEntidade(vo);
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper empresaDAO = JapeFactory.dao(instance);
+            return empresaDAO.delete(vo.getPrimaryKey());
+        } catch (Exception e) {
+            throw new MGEModelException("deleteVO error(" + instance + "):" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+
     /**
      * Alterar o valor do campo informado
      *
@@ -315,10 +352,35 @@ public class JapeHelper {
     }
 
     /**
+     * Alterar o valor do campo informado
+     *
+     * @param name  Nome do campo
+     * @param value Valor
+     * @param vo    DynamicVO do item a ser atualizado
+     */
+    public static void setCampo(String name, Object value, DynamicVO vo) throws MGEModelException {
+        String instance = getEntidade(vo);
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidUpdateVO fluidupdate = instanciaDAO.prepareToUpdateByPK(vo.getPrimaryKey());
+            fluidupdate.set(name, value);
+            fluidupdate.update();
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new MGEModelException("setCampo Error:" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    /**
      * Retorna os registros baseados em uma consulta
      *
      * @param instancia Nome da instancia
      * @param where     Condição para retornar o registro
+     * @param values    Parametros a serem injetados na consulta
      */
     public static Collection<DynamicVO> getVOs(String instancia, String where, Object... values) throws MGEModelException {
         Collection<DynamicVO> dynamicVo;
@@ -370,6 +432,7 @@ public class JapeHelper {
      * @return DynamicVO
      */
     public static DynamicVO setCampos(Map<String, Object> values, DynamicVO vo, String instance) throws MGEModelException {
+
         JapeSession.SessionHandle hnd = null;
         try {
             hnd = JapeSession.open();
@@ -389,6 +452,33 @@ public class JapeHelper {
         }
     }
 
+    /**
+     * Alterar o valor de mutiplos campos informados
+     *
+     * @param values Hashmap com nome e valor do campo
+     * @param vo     DynamicVO do item a ser atualizado
+     * @return DynamicVO
+     */
+    public static DynamicVO setCampos(Map<String, Object> values, DynamicVO vo) throws MGEModelException {
+        String instance = getEntidade(vo);
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidUpdateVO fluidupdate = instanciaDAO.prepareToUpdate(vo);
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                fluidupdate.set(name, value);
+            }
+            fluidupdate.update();
+            return instanciaDAO.findByPK(vo.getPrimaryKey());
+        } catch (Exception e) {
+            throw new MGEModelException("setCampos Error:" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
 
     public static DynamicVO update(Map<String, Object> values, String instance, String where, Object... params) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
@@ -419,10 +509,34 @@ public class JapeHelper {
 
 
     public static DynamicVO updateVO(String instance, DynamicVO vo) throws Exception {
+
         EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
         PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
 
         return (DynamicVO) entity.getValueObject();
+    }
+
+    public static DynamicVO updateVO(DynamicVO vo) throws Exception {
+        String instance = getEntidade(vo);
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
+
+        return (DynamicVO) entity.getValueObject();
+    }
+
+    public static String getEntidade(DynamicVO vo) {
+        if (vo == null) {
+            throw new NullPointerException("getEntidade: 'vo' is null");
+        }
+        String valueObjectID = vo.getValueObjectID();
+        if (valueObjectID == null) {
+            throw new NullPointerException("valueObjectID");
+        }
+
+        int index = valueObjectID.indexOf('.');
+        return index >= 0
+            ? valueObjectID.substring(0, index)
+            : valueObjectID;
     }
 
     /**

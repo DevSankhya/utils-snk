@@ -73,6 +73,9 @@ public class Http {
             localHost = protocol + "://" + baseurl + ":" + porta;
         }
     }
+    public String getLastUrlCalled() {
+        return lastUrlCalled;
+    }
 
     public long getTimeOut() {
         return timeOut;
@@ -194,19 +197,12 @@ public class Http {
         Request request = requestBuild.build();
         try (Response response = unzip(okHttpClient.newCall(request).execute())) {
             assert response.body() != null;
-            response.close();
-            response.close();
             return Triple.of(response.body().string(), response.headers(), response.headers().values("Set-Cookie"));
         } catch (IOException e) {
             throw new IOException("Erro ao executar requisição(" + lastUrlCalled + "):" + e);
-        } finally {
-            okHttpClient.dispatcher().executorService().shutdown();
         }
     }
 
-    public String getLastUrlCalled() {
-        return lastUrlCalled;
-    }
 
     public <T> Triple<T, Headers, List<String>> get(String url, Class<T> clazz) throws IOException {
         // Tratamento de paramentros query
@@ -240,8 +236,6 @@ public class Http {
             return Triple.of(gson.fromJson(responseJson, clazz), response.headers(), response.headers().values("Set-Cookie"));
         } catch (Exception e) {
             throw new IOException("Erro ao executar requisição(" + lastUrlCalled + "):" + e);
-        } finally {
-            okHttpClient.dispatcher().executorService().shutdown();
         }
     }
 
@@ -313,8 +307,6 @@ public class Http {
             return Triple.of(response.body().string(), response.headers(), response.headers().values("Set-Cookie"));
         } catch (IOException e) {
             throw new IOException("Erro ao executar requisição(" + lastUrlCalled + "):" + e);
-        } finally {
-            okHttpClient.dispatcher().executorService().shutdown();
         }
     }
 
