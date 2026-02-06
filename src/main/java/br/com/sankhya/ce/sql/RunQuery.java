@@ -196,22 +196,11 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         ResultSetMetaData rsmd = getMetaData();
         if (rsmd == null) return results;
         forEach(row -> {
-            int numColumns;
             try {
-                numColumns = rsmd.getColumnCount();
+                results.add(toMap(row));
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-            Map<String, Object> obj = new LinkedHashMap<>();
-            for (int i = 1; i <= numColumns; i++) {
-                try {
-                    String columnName = rsmd.getColumnName(i);
-                    obj.put(columnName, row.getObject(columnName));
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            results.add(obj);
         });
         return results;
     }
