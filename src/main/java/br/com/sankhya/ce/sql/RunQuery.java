@@ -72,41 +72,44 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     }
 
     public void execute() throws Exception {
-        JapeSession.execEnsuringTX(() -> {
-            try {
-                hnd.setFindersMaxRows(-1);
-                EntityFacade entity = EntityFacadeFactory.getDWFFacade();
-                jdbc = entity.getJdbcWrapper();
-                jdbc.openSession();
-                sql = new NativeSql(jdbc).appendSql(query);
-
-                for (Map.Entry<Object, Object> objectObjectEntry : params.entrySet()) {
-                    Object key = objectObjectEntry.getKey();
-                    if (key instanceof Number) {
-                        sql.setParameter(((Number) key).intValue(), objectObjectEntry.getValue());
-                        continue;
-                    }
-                    if (key instanceof String) {
-                        sql.setNamedParameter((String) key, objectObjectEntry.getValue());
-                    }
-                }
-
-                sql = callBack.apply(sql);
-
-                SqlCommandType type = getSqlCommandType(query);
-                if (canUseExecuteQuery(type)) {
-                    resultSet = sql.executeQuery();
-                    status = true;
-                } else if (canUseExecuteUpdate(type)) {
-                    status = sql.executeUpdate();
-                } else {
-                    throw new IllegalArgumentException("Unknown SQL command: " + query);
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("Error during query execution: " + e.getMessage(), e);
-            }
-        });
+        JapeSession.execEnsuringTX(this::executeWithouTransaction);
     }
+
+    public void executeWithouTransaction() {
+        try {
+            hnd.setFindersMaxRows(-1);
+            EntityFacade entity = EntityFacadeFactory.getDWFFacade();
+            jdbc = entity.getJdbcWrapper();
+            jdbc.openSession();
+            sql = new NativeSql(jdbc).appendSql(query);
+
+            for (Map.Entry<Object, Object> objectObjectEntry : params.entrySet()) {
+                Object key = objectObjectEntry.getKey();
+                if (key instanceof Number) {
+                    sql.setParameter(((Number) key).intValue(), objectObjectEntry.getValue());
+                    continue;
+                }
+                if (key instanceof String) {
+                    sql.setNamedParameter((String) key, objectObjectEntry.getValue());
+                }
+            }
+
+            sql = callBack.apply(sql);
+
+            SqlCommandType type = getSqlCommandType(query);
+            if (canUseExecuteQuery(type)) {
+                resultSet = sql.executeQuery();
+                status = true;
+            } else if (canUseExecuteUpdate(type)) {
+                status = sql.executeUpdate();
+            } else {
+                throw new IllegalArgumentException("Unknown SQL command: " + query);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error during query execution: " + e.getMessage(), e);
+        }
+    }
+
 
     public boolean canUseExecuteQuery(SqlCommandType type) {
         return type == SqlCommandType.SELECT;
@@ -296,7 +299,7 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         };
     }
 
-    public Map<String, Object> toMap(ResultSet resultSet) throws SQLException {
+    public static Map<String, Object> toMap(ResultSet resultSet) throws SQLException {
         ResultSetMetaData rsmd = resultSet.getMetaData();
         int cols = rsmd.getColumnCount();
         Map<String, Object> result = createCaseInsensitiveHashMap(cols);
