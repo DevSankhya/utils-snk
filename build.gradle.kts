@@ -72,7 +72,8 @@ dependencies {
     // https://mvnrepository.com/artifact/com.squareup.okio/okio
     implementation("com.squareup.okio:okio:1.13.0")
     implementation("org.jetbrains:annotations:24.0.0")
-
+// Source: https://mvnrepository.com/artifact/commons-dbutils/commons-dbutils
+//    implementation("commons-dbutils:commons-dbutils:1.8.1")
     // Manipulador de JSON
     compileOnly("com.google.code.gson", "gson", "2.1")
 

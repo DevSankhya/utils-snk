@@ -6,7 +6,6 @@ import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.sql.NativeSql;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -244,17 +243,6 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
 
 
     }
-    private Map<String, Object> toMap(ResultSet rs) throws SQLException {
-        Map<String, Object> row = new LinkedHashMap<>();
-        ResultSetMetaData rsmd = rs.getMetaData();
-        int numColumns = rsmd.getColumnCount();
-        for (int i = 1; i <= numColumns; i++) {
-            String columnName = rsmd.getColumnName(i);
-            row.put(columnName, rs.getObject(columnName));
-        }
-        return row;
-    }
-
 
     public interface RowConsumer<T> {
         enum Action {CONTINUE, BREAK}
@@ -291,29 +279,93 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     @Override
     public @NotNull Iterator<ResultSet> iterator() {
         return new Iterator<ResultSet>() {
-            private boolean hasNextChecked = false;
-            private boolean hasNext = false;
 
             @Override
             public boolean hasNext() {
-                if (!hasNextChecked) {
-                    try {
-                        hasNext = resultSet != null && resultSet.next();
-                    } catch (SQLException e) {
-                        throw new RuntimeException(e);
-                    }
-                    hasNextChecked = true;
+                try {
+                    return !resultSet.isLast();
+                } catch (SQLException e) {
+                    this.rethrow(e);
+                    return false;
                 }
-                return hasNext;
             }
 
             @Override
             public ResultSet next() {
-                if (!hasNext()) throw new NoSuchElementException("No more rows available.");
-                hasNextChecked = false;
-                return resultSet;
+                try {
+                    resultSet.next();
+                    return resultSet;
+                } catch (SQLException e) {
+                    this.rethrow(e);
+                    return null;
+                }
+            }
+
+            private void rethrow(SQLException e) {
+                throw new RuntimeException(e.getMessage());
             }
         };
+    }
+
+    public Map<String, Object> toMap(ResultSet resultSet) throws SQLException {
+        ResultSetMetaData rsmd = resultSet.getMetaData();
+        int cols = rsmd.getColumnCount();
+        Map<String, Object> result = createCaseInsensitiveHashMap(cols);
+
+        for (int i = 1; i <= cols; ++i) {
+            String propKey = rsmd.getColumnLabel(i);
+            if (null == propKey || propKey.isEmpty()) {
+                propKey = rsmd.getColumnName(i);
+            }
+
+            if (null == propKey || propKey.isEmpty()) {
+                propKey = Integer.toString(i);
+            }
+
+            result.put(propKey, resultSet.getObject(i));
+        }
+
+        return result;
+    }
+
+    protected static Map<String, Object> createCaseInsensitiveHashMap(int cols) {
+        return new CaseInsensitiveHashMap(cols);
+    }
+
+    private static final class CaseInsensitiveHashMap extends LinkedHashMap<String, Object> {
+        private static final long serialVersionUID = -2848100435296897392L;
+        private final Map<String, String> lowerCaseMap;
+
+        private CaseInsensitiveHashMap(int initialCapacity) {
+            super(initialCapacity);
+            this.lowerCaseMap = new HashMap<>();
+        }
+
+        public boolean containsKey(Object key) {
+            Object realKey = this.lowerCaseMap.get(key.toString().toLowerCase(Locale.ENGLISH));
+            return super.containsKey(realKey);
+        }
+
+        public Object get(Object key) {
+            Object realKey = this.lowerCaseMap.get(key.toString().toLowerCase(Locale.ENGLISH));
+            return super.get(realKey);
+        }
+
+        public Object put(String key, Object value) {
+            Object oldKey = this.lowerCaseMap.put(key.toLowerCase(Locale.ENGLISH), key);
+            Object oldValue = super.remove(oldKey);
+            super.put(key, value);
+            return oldValue;
+        }
+
+        public void putAll(Map<? extends String, ?> m) {
+            m.forEach(this::put);
+        }
+
+        public Object remove(Object key) {
+            Object realKey = this.lowerCaseMap.remove(key.toString().toLowerCase(Locale.ENGLISH));
+            return super.remove(realKey);
+        }
     }
 }
 
