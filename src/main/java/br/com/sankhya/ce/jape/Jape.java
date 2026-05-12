@@ -1,5 +1,6 @@
 package br.com.sankhya.ce.jape;
 
+import br.com.sankhya.jape.PersistenceError;
 import br.com.sankhya.jape.core.JapeSession;
 
 public final class Jape {
@@ -14,7 +15,23 @@ public final class Jape {
             if (hasActiveTransaction()) {
                 result = execEnsuringTXWithResult(block);
             } else {
-                result = openAndExecute(block);
+                result = openAndExecute(block, true);
+            }
+            return new Result.Ok<>(result);
+        } catch (PersistenceError e) {
+            return secureTransaction(block);
+        } catch (Exception e) {
+            return new Result.Error<>(e);
+        }
+    }
+
+    public static <T> Result<T> withSession(ThrowingSupplier<T> block) {
+        try {
+            T result;
+            if (hasActiveSession()) {
+                result = block.get();
+            } else {
+                result = openAndExecute(block, false);
             }
             return new Result.Ok<>(result);
         } catch (Exception e) {
@@ -39,12 +56,18 @@ public final class Jape {
         return holder.value;
     }
 
-    private static <T> T openAndExecute(ThrowingSupplier<T> block) throws Exception {
+    private static <T> T openAndExecute(ThrowingSupplier<T> block, boolean withTransaction) throws Exception {
         JapeSession.SessionHandle hnd = JapeSession.open();
+
         try {
             hnd.setCanTimeout(false);
 
             final Holder<T> holder = new Holder<>();
+
+            if (!withTransaction) {
+                holder.value = block.get();
+                return holder.value;
+            }
 
             hnd.execWithTX(() -> {
                 try {
@@ -72,7 +95,18 @@ public final class Jape {
         }
     }
 
-    /** Simples holder mutável (equivalente ao var em Kotlin) */
+    private static boolean hasActiveSession() {
+        try {
+            JapeSession.getCurrentSession();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Simples holder mutável (equivalente ao var em Kotlin)
+     */
     private static final class Holder<T> {
         T value;
     }
