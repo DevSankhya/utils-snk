@@ -2,12 +2,8 @@ package br.com.sankhya.ce.jape;
 
 public abstract class Result<T> {
 
-    private Result() {
-    }
-
-    /* ---------- Subtipos ---------- */
-
     public static final class Ok<T> extends Result<T> {
+
         private final T data;
 
         public Ok(T data) {
@@ -20,6 +16,7 @@ public abstract class Result<T> {
     }
 
     public static final class Error<T> extends Result<T> {
+
         private final Exception exception;
 
         public Error(Exception exception) {
@@ -31,47 +28,66 @@ public abstract class Result<T> {
         }
     }
 
-    /* ---------- Operações ---------- */
+    public interface Mapper<T, R> {
+        R map(T value);
+    }
+
+    public interface SuccessConsumer<T> {
+        void accept(T value);
+    }
+
+    public interface ErrorConsumer {
+        void accept(Exception exception);
+    }
 
     public <R> Result<R> map(Mapper<T, R> mapper) {
+
         if (this instanceof Ok) {
             Ok<T> ok = (Ok<T>) this;
-            return new Ok<>(mapper.apply(ok.data));
+            return new Ok<>(mapper.map(ok.getData()));
         }
+
         Error<T> error = (Error<T>) this;
-        return new Error<>(error.exception);
+
+        return new Error<>(error.getException());
     }
 
     public T getOrNull() {
+
         if (this instanceof Ok) {
-            return ((Ok<T>) this).data;
+            return ((Ok<T>) this).getData();
         }
+
         return null;
     }
 
     public T getOrDefault(T defaultValue) {
+
         if (this instanceof Ok) {
-            T data = ((Ok<T>) this).data;
-            return data != null ? data : defaultValue;
+
+            T value = ((Ok<T>) this).getData();
+
+            return value != null ? value : defaultValue;
         }
+
         return defaultValue;
     }
 
     public T getOrThrow() throws Exception {
+
         if (this instanceof Ok) {
-            T data = ((Ok<T>) this).data;
-            if (data == null) {
-                throw new NullPointerException("Resultado nulo");
-            }
-            return data;
+            return ((Ok<T>) this).getData();
         }
-        throw ((Error<T>) this).exception;
+
+        throw ((Error<T>) this).getException();
     }
 
     public Exception getExceptionOrNull() {
+
         if (this instanceof Error) {
-            return ((Error<T>) this).exception;
+            return ((Error<T>) this).getException();
         }
+
         return null;
     }
 
@@ -83,31 +99,29 @@ public abstract class Result<T> {
         return this instanceof Error;
     }
 
-    /* ---------- Helpers ---------- */
+    public Result<T> onSuccess(SuccessConsumer<T> action) {
 
-    public Result<T> onSuccess(Consumer<T> action) {
         if (this instanceof Ok) {
-            action.accept(((Ok<T>) this).data);
+            action.accept(((Ok<T>) this).getData());
         }
+
         return this;
     }
 
-    public Result<T> onError(Consumer<Exception> action) {
+    public Result<T> onError(ErrorConsumer action) {
+
         if (this instanceof Error) {
-            action.accept(((Error<T>) this).exception);
+            action.accept(((Error<T>) this).getException());
         }
+
         return this;
     }
 
-    /* ---------- Functional interfaces ---------- */
-
-    @FunctionalInterface
-    public interface Mapper<T, R> {
-        R apply(T value);
+    public static <T> Result<T> ok(T value) {
+        return new Ok<>(value);
     }
 
-    @FunctionalInterface
-    public interface Consumer<T> {
-        void accept(T value);
+    public static <T> Result<T> error(Exception exception) {
+        return new Error<>(exception);
     }
 }

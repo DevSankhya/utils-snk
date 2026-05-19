@@ -1,5 +1,3 @@
-import java.net.URL
-
 plugins {
     id("java")
     id("application")

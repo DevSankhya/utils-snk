@@ -1,41 +1,53 @@
 package br.com.sankhya.ce.jape;
 
-import br.com.sankhya.jape.PersistenceError;
 import br.com.sankhya.jape.core.JapeSession;
+import br.com.sankhya.modelcore.auth.AuthenticationInfo;
+import br.com.sankhya.modelcore.util.SPBeanUtils;
+import br.com.sankhya.ws.ServiceContext;
+import org.jdom.Element;
+
+import javax.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 
 public final class Jape {
 
     private Jape() {
-        // util class
+    }
+
+    @FunctionalInterface
+    public interface ThrowingSupplier<T> {
+        T get() throws Exception;
     }
 
     public static <T> Result<T> secureTransaction(ThrowingSupplier<T> block) {
         try {
             T result;
+
             if (hasActiveTransaction()) {
                 result = execEnsuringTXWithResult(block);
             } else {
-                result = openAndExecute(block, true);
+                result = openAndExecute(true, block);
             }
-            return new Result.Ok<>(result);
-        } catch (PersistenceError e) {
-            return secureTransaction(block);
+
+            return Result.ok(result);
         } catch (Exception e) {
-            return new Result.Error<>(e);
+            return Result.error(e);
         }
     }
 
     public static <T> Result<T> withSession(ThrowingSupplier<T> block) {
         try {
             T result;
+
             if (hasActiveSession()) {
                 result = block.get();
             } else {
-                result = openAndExecute(block, false);
+                result = openAndExecute(false, block);
             }
-            return new Result.Ok<>(result);
+
+            return Result.ok(result);
         } catch (Exception e) {
-            return new Result.Error<>(e);
+            return Result.error(e);
         }
     }
 
@@ -53,18 +65,21 @@ public final class Jape {
         if (holder.value == null) {
             throw new IllegalStateException("Bloco executado sem retorno");
         }
+
         return holder.value;
     }
 
-    private static <T> T openAndExecute(ThrowingSupplier<T> block, boolean withTransaction) throws Exception {
+    private static <T> T openAndExecute(boolean runOnTransaction, ThrowingSupplier<T> block) throws Exception {
         JapeSession.SessionHandle hnd = JapeSession.open();
 
         try {
-            hnd.setCanTimeout(false);
-
             final Holder<T> holder = new Holder<>();
 
-            if (!withTransaction) {
+            hnd.setCanTimeout(false);
+
+            if (!runOnTransaction) {
+                setSessionProperties();
+
                 holder.value = block.get();
                 return holder.value;
             }
@@ -76,10 +91,6 @@ public final class Jape {
                     throw new RuntimeException(e);
                 }
             });
-
-            if (holder.value == null) {
-                throw new IllegalStateException("Resultado nulo inesperado");
-            }
 
             return holder.value;
         } finally {
@@ -97,17 +108,38 @@ public final class Jape {
 
     private static boolean hasActiveSession() {
         try {
-            JapeSession.getCurrentSession();
-            return true;
+            return JapeSession.getCurrentSession() != null;
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * Simples holder mutável (equivalente ao var em Kotlin)
-     */
-    private static final class Holder<T> {
+    public static void setSessionProperties() {
+        AuthenticationInfo auth = new AuthenticationInfo("SUP", BigDecimal.ZERO, BigDecimal.ZERO, 1);
+
+        auth.makeCurrent();
+
+        ServiceContext sctx = new ServiceContext((HttpServletRequest) null);
+
+        sctx.setAutentication(AuthenticationInfo.getCurrent());
+
+        Element bodyElem = new Element("serviceRequest");
+        Element requestBody = new Element("requestBody");
+
+        bodyElem.addContent(requestBody);
+
+        sctx.setRequestBody(bodyElem);
+
+        sctx.makeCurrent();
+
+        try {
+            SPBeanUtils.setupContext(sctx);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static class Holder<T> {
         T value;
     }
 }
