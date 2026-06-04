@@ -78,7 +78,7 @@ public final class Jape {
             hnd.setCanTimeout(false);
 
             if (!runOnTransaction) {
-                setSessionProperties();
+                setupAsSup();
 
                 holder.value = block.get();
                 return holder.value;
@@ -106,7 +106,7 @@ public final class Jape {
         }
     }
 
-    private static boolean hasActiveSession() {
+    public static boolean hasActiveSession() {
         try {
             return JapeSession.getCurrentSession() != null;
         } catch (Exception e) {
@@ -114,8 +114,16 @@ public final class Jape {
         }
     }
 
-    public static void setSessionProperties() {
-        AuthenticationInfo auth = new AuthenticationInfo("SUP", BigDecimal.ZERO, BigDecimal.ZERO, 1);
+    public static void setupAsSup() {
+        AuthenticationInfo current = AuthenticationInfo.getCurrent();
+        if (hasActiveSession() && current != null) return;
+        setSessionProperties("SUP");
+    }
+
+    public static void setSessionProperties(String user) {
+
+
+        AuthenticationInfo auth = new AuthenticationInfo(user, BigDecimal.ZERO, BigDecimal.ZERO, 0);
 
         auth.makeCurrent();
 

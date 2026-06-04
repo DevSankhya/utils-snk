@@ -22,6 +22,8 @@ public class ResolveSqlTypes {
     public String replaceParameters(String sql, Object... parameters) {
         StringBuilder result = new StringBuilder();
         int paramIndex = 0;
+        if (sql == null)
+            return null;
 
         for (int i = 0; i < sql.length(); i++) {
             char currentChar = sql.charAt(i);
@@ -57,7 +59,7 @@ public class ResolveSqlTypes {
         } else if (parameter instanceof Date) {
             return type == Database.ORACLE ? getOracleDate((Date) parameter) : getMssqlDate((Date) parameter);
         } else if (parameter instanceof Boolean) {
-            return (Boolean) parameter ? "1" : "0";
+            return (Boolean) parameter ? "'S'" : "'N'";
         } else {
             throw new IllegalArgumentException("Unsupported parameter type: " + parameter.getClass().getName());
         }

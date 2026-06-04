@@ -14,136 +14,162 @@ import br.com.sankhya.jape.wrapper.JapeWrapper;
 import br.com.sankhya.jape.wrapper.fluid.FluidCreateVO;
 import br.com.sankhya.jape.wrapper.fluid.FluidUpdateVO;
 import br.com.sankhya.modelcore.MGEModelException;
-import br.com.sankhya.modelcore.auth.AuthenticationInfo;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
-import br.com.sankhya.modelcore.util.SPBeanUtils;
-import br.com.sankhya.ws.ServiceContext;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import org.jdom.Element;
+import org.jetbrains.annotations.NotNull;
 
-import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 @SuppressWarnings({"unused"})
+@Deprecated
 public class JapeHelper {
 
 
-    public static class SessionManager {
-        private boolean internalTransaction = true;
-        private JapeSession.SessionHandle hnd;
-
-        public SessionManager() {
-            hnd = open();
+    public static ResolveSqlTypes.Database getDialect() {
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        JdbcWrapper jdbcWrapper = dwfFacade.getJdbcWrapper();
+        String databaseProductName = "unknown";
+        try {
+            if (jdbcWrapper.isOracle()) return ResolveSqlTypes.Database.ORACLE;
+            return ResolveSqlTypes.Database.MSSQL;
+        } catch (Exception e) {
+            return ResolveSqlTypes.Database.UNKNOW;
+        } finally {
+            jdbcWrapper.closeSession();
         }
-
-        public JapeSession.SessionHandle open() {
-            JapeSession.SessionHandle hnd;
-            boolean hasCurrentSession = JapeSession.hasCurrentSession();
-            boolean hasTransaction = false;
-            if (hasCurrentSession) hasTransaction = JapeSession.getCurrentSession().hasTransaction();
-            if (hasCurrentSession && hasTransaction) {
-                this.internalTransaction = false;
-                hnd = JapeSession.getCurrentSession().getTopMostHandle();
-            } else hnd = JapeSession.open();
-            this.hnd = hnd;
-            return hnd;
-        }
-
-        public void canTimeout(boolean canTimeout) {
-            this.hnd.setCanTimeout(canTimeout);
-            this.hnd.setSessionTimeout(Long.MAX_VALUE);
-        }
-
-        public void close() {
-            if (!this.internalTransaction) // N?o fecha a conex?o se ela n?o pertence a instancia desta, pois esta aproveita a conex?o externa
-                return;
-
-            JapeHelper.closeHnd(hnd);
-        }
-
-        public void close(JapeSession.SessionHandle hnd) {
-            if (!this.internalTransaction) // N?o fecha a conex?o se ela n?o pertence a instancia desta, pois esta aproveita a conex?o externa
-                return;
-
-            JapeHelper.closeHnd(hnd);
-        }
-    }
-
-    public static void closeHnd(JapeSession.SessionHandle hnd) {
-        boolean hasCurrentSession = JapeSession.hasCurrentSession();
-        boolean hasTransaction = false;
-        if (hasCurrentSession) hasTransaction = JapeSession.getCurrentSession().hasTransaction();
-
-        if (hnd != null && hasTransaction) JapeSession.close(hnd);
     }
 
     /**
-     * Método para criar um novo registro na instância informada.
+     * Retorna o DynamicVO baseado em uma consulta
      *
-     * @param values:   HashMap<String, Object>: Nomes e valores dos campos.
-     * @param instance: String: instancia a ser criado o novo registro
-     * @return String
-     * @author Luis Ricardo Alves Santos
+     * @param instancia Nome da instancia
+     * @param where     Condição para retornar o registro
      */
-    private static DynamicVO createNewLine(Map<String, Object> values, String instance) throws MGEModelException {
+    @SuppressWarnings({"unused"})
+    @Deprecated
+    public static DynamicVO getVO(String instancia, String where, Object... values) throws MGEModelException {
+        DynamicVO dynamicVo;
         JapeSession.SessionHandle hnd = null;
-        StringBuilder listValues = new StringBuilder();
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, values);
         try {
             hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
-            FluidCreateVO fluidCreateVO = instanciaDAO.create();
-            for (Map.Entry<String, Object> entry : values.entrySet()) {
-                String name = entry.getKey();
-                Object value = entry.getValue();
-                fluidCreateVO.set(name, value);
-                listValues.append(name).append("= ").append(value).append("\n");
-            }
-            return fluidCreateVO.save();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.findOne(where);
         } catch (Exception e) {
-            if (e.getMessage().contains("transação ativa")) return createNewLine(values, instance, true);
-            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
         } finally {
             JapeSession.close(hnd);
         }
+        return dynamicVo;
     }
 
-    private static DynamicVO createNewLine(Map<String, Object> values, String instance, Boolean repeat) throws MGEModelException {
-
+    /**
+     * Retorna o DynamicVO baseado em uma consulta
+     *
+     * @param instancia Nome da instancia
+     * @param where     Condição para retornar o registro
+     */
+    @SuppressWarnings({"unused"})
+    @Deprecated
+    public static DynamicVO getVO(String instancia, String where) throws MGEModelException {
+        DynamicVO dynamicVo;
         JapeSession.SessionHandle hnd = null;
-        StringBuilder listValues = new StringBuilder();
         try {
             hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
-            FluidCreateVO fluidCreateVO = instanciaDAO.create();
-            for (Map.Entry<String, Object> entry : values.entrySet()) {
-                String name = entry.getKey();
-                Object value = entry.getValue();
-                fluidCreateVO.set(name, value);
-                listValues.append(name).append("= ").append(value).append("\n");
-            }
-            return fluidCreateVO.save();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.findOne(where);
         } catch (Exception e) {
-            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
         } finally {
             JapeSession.close(hnd);
         }
+        return dynamicVo;
     }
 
-    private static DynamicVO createNewLine(String instance, DynamicVO vo) throws MGEModelException {
-
-        JapeHelper.setSessionProperties();
+    /**
+     * Retorna os registros baseados em uma consulta
+     *
+     * @param instancia Nome da instancia
+     * @param where     Condição para retornar o registro
+     * @param values    Parametros a serem injetados na consulta
+     */
+    @Deprecated
+    public static Collection<DynamicVO> getVOs(String instancia, String where, Object... values) throws MGEModelException {
+        Collection<DynamicVO> dynamicVo;
+        JapeSession.SessionHandle hnd = null;
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, values);
         try {
-            EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
-            PersistentLocalEntity entity = dwfFacade.createEntity(instance, (EntityVO) vo);
-
-            return (DynamicVO) entity.getValueObject();
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.find(where);
         } catch (Exception e) {
-            throw new MGEModelException("createNewLine Error:" + e.getMessage());
+            throw new MGEModelException("Erro getVOs(" + instancia + "): " + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
         }
+        return dynamicVo;
+    }
+
+    public static DynamicVO findOne(String instancia, String where, Object... values) throws MGEModelException {
+        DynamicVO dynamicVo;
+        JapeSession.SessionHandle hnd = null;
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, values);
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.findOne(where);
+        } catch (Exception e) {
+            throw new MGEModelException("Erro findOne(" + instancia + "): " + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+        return dynamicVo;
+    }
+
+    public static DynamicVO findOne(String instancia, String where) throws MGEModelException {
+        DynamicVO dynamicVo;
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.findOne(where);
+        } catch (Exception e) {
+            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+        return dynamicVo;
+    }
+
+    /**
+     * Retorna os registros baseados em uma consulta
+     *
+     * @param instancia Nome da instancia
+     * @param where     Condição para retornar o registro
+     * @param values    Parametros a serem injetados na consulta
+     */
+    public static Collection<DynamicVO> findAll(String instancia, String where, Object... values) throws MGEModelException {
+        Collection<DynamicVO> dynamicVo;
+        JapeSession.SessionHandle hnd = null;
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, values);
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
+            dynamicVo = instanciaDAO.find(where);
+        } catch (Exception e) {
+            throw new MGEModelException("Erro findAll(" + instancia + "): " + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+        return dynamicVo;
     }
 
     /**
@@ -172,8 +198,8 @@ public class JapeHelper {
     /**
      * Retorna o valor de um campo(PK)
      *
-     * @param name      Nome da propriedade
-     * @param it        DynamicVO do registro
+     * @param name Nome da propriedade
+     * @param it   DynamicVO do registro
      * @return [T]
      */
     @SuppressWarnings({"unchecked", "unused"})
@@ -191,6 +217,7 @@ public class JapeHelper {
             JapeSession.close(hnd);
         }
     }
+
     /**
      * Retorna o valor de um campo(Where)
      *
@@ -222,7 +249,6 @@ public class JapeHelper {
             JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
             DynamicVO fluidGetVO = instanciaDAO.findOne(where);
             try {
-
                 return (T) fluidGetVO.getProperty(name);
             } catch (Exception e) {
                 return null;
@@ -232,171 +258,6 @@ public class JapeHelper {
         } finally {
             JapeSession.close(hnd);
         }
-    }
-
-    /**
-     * Retorna o DynamicVO baseado em uma consulta
-     *
-     * @param instancia Nome da instancia
-     * @param where     Condição para retornar o registro
-     */
-    @SuppressWarnings({"unused"})
-    public static DynamicVO getVO(String instancia, String where) throws MGEModelException {
-        DynamicVO dynamicVo;
-        JapeSession.SessionHandle hnd = null;
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
-            dynamicVo = instanciaDAO.findOne(where);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-        return dynamicVo;
-    }
-
-
-    public static ResolveSqlTypes.Database getDialect() {
-        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
-        JdbcWrapper jdbcWrapper = dwfFacade.getJdbcWrapper();
-        String databaseProductName = "unknown";
-        try {
-            if (jdbcWrapper.isOracle()) return ResolveSqlTypes.Database.ORACLE;
-            return ResolveSqlTypes.Database.MSSQL;
-        } catch (Exception e) {
-            return ResolveSqlTypes.Database.UNKNOW;
-        } finally {
-            jdbcWrapper.closeSession();
-        }
-    }
-
-    /**
-     * Retorna o DynamicVO baseado em uma consulta
-     *
-     * @param instancia Nome da instancia
-     * @param where     Condição para retornar o registro
-     */
-    @SuppressWarnings({"unused"})
-    public static DynamicVO getVO(String instancia, String where, Object... values) throws MGEModelException {
-        DynamicVO dynamicVo;
-        JapeSession.SessionHandle hnd = null;
-        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
-        where = resolveSqlTypes.replaceParameters(where, values);
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
-            dynamicVo = instanciaDAO.findOne(where);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new MGEModelException("Erro getVO(" + instancia + "): " + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-        return dynamicVo;
-    }
-
-
-    public static boolean deleteVO(DynamicVO vo, String instance) throws MGEModelException {
-
-        JapeSession.SessionHandle hnd = null;
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper empresaDAO = JapeFactory.dao(instance);
-            return empresaDAO.delete(vo.getPrimaryKey());
-        } catch (Exception e) {
-            throw new MGEModelException("deleteVO error(" + instance + "):" + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-    }
-
-    public static boolean deleteVO(DynamicVO vo) throws MGEModelException {
-        String instance = getEntidade(vo);
-        JapeSession.SessionHandle hnd = null;
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper empresaDAO = JapeFactory.dao(instance);
-            return empresaDAO.delete(vo.getPrimaryKey());
-        } catch (Exception e) {
-            throw new MGEModelException("deleteVO error(" + instance + "):" + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-    }
-
-
-    /**
-     * Alterar o valor do campo informado
-     *
-     * @param name     Nome do campo
-     * @param value    Valor
-     * @param vo       DynamicVO do item a ser atualizado
-     * @param instance Instância - Default: Instância atual
-     */
-    public static void setCampo(String name, Object value, DynamicVO vo, String instance) throws MGEModelException {
-        JapeSession.SessionHandle hnd = null;
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
-            FluidUpdateVO fluidupdate = instanciaDAO.prepareToUpdateByPK(vo.getPrimaryKey());
-            fluidupdate.set(name, value);
-            fluidupdate.update();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new MGEModelException("setCampo Error:" + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-    }
-
-    /**
-     * Alterar o valor do campo informado
-     *
-     * @param name  Nome do campo
-     * @param value Valor
-     * @param vo    DynamicVO do item a ser atualizado
-     */
-    public static void setCampo(String name, Object value, DynamicVO vo) throws MGEModelException {
-        String instance = getEntidade(vo);
-        JapeSession.SessionHandle hnd = null;
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
-            FluidUpdateVO fluidupdate = instanciaDAO.prepareToUpdateByPK(vo.getPrimaryKey());
-            fluidupdate.set(name, value);
-            fluidupdate.update();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new MGEModelException("setCampo Error:" + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-    }
-
-    /**
-     * Retorna os registros baseados em uma consulta
-     *
-     * @param instancia Nome da instancia
-     * @param where     Condição para retornar o registro
-     * @param values    Parametros a serem injetados na consulta
-     */
-    public static Collection<DynamicVO> getVOs(String instancia, String where, Object... values) throws MGEModelException {
-        Collection<DynamicVO> dynamicVo;
-        JapeSession.SessionHandle hnd = null;
-        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
-        where = resolveSqlTypes.replaceParameters(where, values);
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instancia);
-            dynamicVo = instanciaDAO.find(where);
-        } catch (Exception e) {
-            throw new MGEModelException("Erro getVOs(" + instancia + "): " + e.getMessage());
-        } finally {
-            JapeSession.close(hnd);
-        }
-        return dynamicVo;
     }
 
     /**
@@ -480,65 +341,6 @@ public class JapeHelper {
         }
     }
 
-    public static DynamicVO update(Map<String, Object> values, String instance, String where, Object... params) throws MGEModelException {
-        JapeSession.SessionHandle hnd = null;
-        StringBuilder listValues = new StringBuilder();
-        JapeHelper.setSessionProperties();
-        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
-        where = resolveSqlTypes.replaceParameters(where, params);
-        try {
-            hnd = JapeSession.open();
-            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
-            DynamicVO fluidGetVO = instanciaDAO.findOne(where);
-
-            JapeWrapper updateDAO = JapeFactory.dao(instance);
-
-            for (Map.Entry<String, Object> entry : values.entrySet()) {
-                String name = entry.getKey();
-                Object value = entry.getValue();
-                fluidGetVO.setProperty(name, value);
-                listValues.append(name).append("= ").append(value).append("\n");
-            }
-            return JapeHelper.updateVO(instance, fluidGetVO);
-        } catch (Exception e) {
-            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
-        } finally {
-            JapeSession.close(hnd);
-        }
-    }
-
-
-    public static DynamicVO updateVO(String instance, DynamicVO vo) throws Exception {
-
-        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
-        PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
-
-        return (DynamicVO) entity.getValueObject();
-    }
-
-    public static DynamicVO updateVO(DynamicVO vo) throws Exception {
-        String instance = getEntidade(vo);
-        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
-        PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
-
-        return (DynamicVO) entity.getValueObject();
-    }
-
-    public static String getEntidade(DynamicVO vo) {
-        if (vo == null) {
-            throw new NullPointerException("getEntidade: 'vo' is null");
-        }
-        String valueObjectID = vo.getValueObjectID();
-        if (valueObjectID == null) {
-            throw new NullPointerException("valueObjectID");
-        }
-
-        int index = valueObjectID.indexOf('.');
-        return index >= 0
-            ? valueObjectID.substring(0, index)
-            : valueObjectID;
-    }
-
     /**
      * Alterar o valor de mutiplos campos informados
      *
@@ -568,6 +370,139 @@ public class JapeHelper {
         }
     }
 
+    /**
+     * Alterar o valor do campo informado
+     *
+     * @param name     Nome do campo
+     * @param value    Valor
+     * @param vo       DynamicVO do item a ser atualizado
+     * @param instance Instância - Default: Instância atual
+     */
+    public static void setCampo(String name, Object value, DynamicVO vo, String instance) throws MGEModelException {
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidUpdateVO fluidupdate = instanciaDAO.prepareToUpdateByPK(vo.getPrimaryKey());
+            fluidupdate.set(name, value);
+            fluidupdate.update();
+        } catch (Exception e) {
+            throw new MGEModelException("setCampo Error:" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    /**
+     * Alterar o valor do campo informado
+     *
+     * @param name  Nome do campo
+     * @param value Valor
+     * @param vo    DynamicVO do item a ser atualizado
+     */
+    public static void setCampo(String name, Object value, DynamicVO vo) throws MGEModelException {
+        String instance = getEntidade(vo);
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidUpdateVO fluidupdate = instanciaDAO.prepareToUpdateByPK(vo.getPrimaryKey());
+            fluidupdate.set(name, value);
+            fluidupdate.update();
+        } catch (Exception e) {
+            throw new MGEModelException("setCampo Error:" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    public static DynamicVO update(Map<String, Object> values, String instance, String where, Object... params) throws Exception {
+        JapeSession.SessionHandle hnd = null;
+        StringBuilder listValues = new StringBuilder();
+        Jape.setupAsSup();
+        ResolveSqlTypes resolveSqlTypes = new ResolveSqlTypes(getDialect());
+        where = resolveSqlTypes.replaceParameters(where, params);
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            DynamicVO fluidGetVO = instanciaDAO.findOne(where);
+
+            JapeWrapper updateDAO = JapeFactory.dao(instance);
+
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                fluidGetVO.setProperty(name, value);
+                listValues.append(name).append("= ").append(value).append("\n");
+            }
+            return JapeHelper.updateVO(instance, fluidGetVO);
+        } catch (Exception e) {
+            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    public static DynamicVO updateVO(String instance, DynamicVO vo) throws Exception {
+
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
+
+        return (DynamicVO) entity.getValueObject();
+    }
+
+    public static DynamicVO updateVO(DynamicVO vo) throws Exception {
+        String instance = getEntidade(vo);
+        EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+        PersistentLocalEntity entity = dwfFacade.saveEntity(instance, (EntityVO) vo);
+
+        return (DynamicVO) entity.getValueObject();
+    }
+
+    public static boolean deleteVO(DynamicVO vo, String instance) throws MGEModelException {
+
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper empresaDAO = JapeFactory.dao(instance);
+            return empresaDAO.delete(vo.getPrimaryKey());
+        } catch (Exception e) {
+            throw new MGEModelException("deleteVO error(" + instance + "):" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    public static boolean deleteVO(DynamicVO vo) throws MGEModelException {
+        String instance = getEntidade(vo);
+        JapeSession.SessionHandle hnd = null;
+        try {
+            hnd = JapeSession.open();
+            JapeWrapper empresaDAO = JapeFactory.dao(instance);
+            return empresaDAO.delete(vo.getPrimaryKey());
+        } catch (Exception e) {
+            throw new MGEModelException("deleteVO error(" + instance + "):" + e.getMessage());
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    public static String getEntidade(DynamicVO vo) {
+        if (vo == null) {
+            throw new NullPointerException("getEntidade: 'vo' is null");
+        }
+        String valueObjectID = vo.getValueObjectID();
+        if (valueObjectID == null) {
+            throw new NullPointerException("valueObjectID");
+        }
+
+        int index = valueObjectID.indexOf('.');
+        return index >= 0
+            ? valueObjectID.substring(0, index)
+            : valueObjectID;
+    }
+
+
     public static DynamicVO persist(String instance, DynamicVO vo) throws Exception {
         EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
         try {
@@ -582,7 +517,7 @@ public class JapeHelper {
     private static DynamicVO persist(Map<String, Object> values, String instance) throws MGEModelException {
         JapeSession.SessionHandle hnd = null;
         StringBuilder listValues = new StringBuilder();
-        JapeHelper.setSessionProperties();
+        Jape.setupAsSup();
         try {
             hnd = JapeSession.open();
             JapeWrapper instanciaDAO = JapeFactory.dao(instance);
@@ -601,22 +536,44 @@ public class JapeHelper {
         }
     }
 
-
-    private static void setSessionProperties() {
-        AuthenticationInfo auth = new AuthenticationInfo("SUP", BigDecimal.ZERO, BigDecimal.ZERO, 1);
-        auth.makeCurrent();
-
-        ServiceContext sctx = new ServiceContext(null);
-        sctx.setAutentication(AuthenticationInfo.getCurrent());
-        Element bodyElem = new Element("serviceRequest");
-        Element requestBody = new Element("requestBody");
-        bodyElem.addContent(requestBody);
-        sctx.setRequestBody(bodyElem);
-        sctx.makeCurrent();
+    /**
+     * Método para criar um novo registro na instância informada.
+     *
+     * @param values:   HashMap<String, Object>: Nomes e valores dos campos.
+     * @param instance: String: instancia a ser criado o novo registro
+     * @return String
+     * @author Luis Ricardo Alves Santos
+     */
+    private static DynamicVO createNewLine(Map<String, Object> values, String instance) throws MGEModelException {
+        JapeSession.SessionHandle hnd = null;
+        StringBuilder listValues = new StringBuilder();
         try {
-            SPBeanUtils.setupContext(sctx);
+            hnd = JapeSession.open();
+            JapeWrapper instanciaDAO = JapeFactory.dao(instance);
+            FluidCreateVO fluidCreateVO = instanciaDAO.create();
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String name = entry.getKey();
+                Object value = entry.getValue();
+                fluidCreateVO.set(name, value);
+                listValues.append(name).append("= ").append(value).append("\n");
+            }
+            return fluidCreateVO.save();
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new MGEModelException("createNewLine Error:" + e.getMessage() + "\n Values:\n" + listValues);
+        } finally {
+            JapeSession.close(hnd);
+        }
+    }
+
+    private static DynamicVO createNewLine(String instance, DynamicVO vo) throws MGEModelException {
+        Jape.setupAsSup();
+        try {
+            EntityFacade dwfFacade = EntityFacadeFactory.getDWFFacade();
+            PersistentLocalEntity entity = dwfFacade.createEntity(instance, (EntityVO) vo);
+
+            return (DynamicVO) entity.getValueObject();
+        } catch (Exception e) {
+            throw new MGEModelException("createNewLine Error:" + e.getMessage());
         }
     }
 
@@ -629,10 +586,12 @@ public class JapeHelper {
             this.instance = instance;
         }
 
+        @NotNull
         public DynamicVO save() throws MGEModelException {
             return createNewLine(values, instance);
         }
 
+        @NotNull
         public DynamicVO saveVO() throws MGEModelException {
             return createNewLine(instance, this.vo);
         }
@@ -670,6 +629,7 @@ public class JapeHelper {
         }
 
 
+        @NotNull
         public DynamicVO persist() throws Exception {
             if (this.vo != null && vo.getPrimaryKey() != null) return JapeHelper.persist(instance, this.vo);
             return JapeHelper.persist(values, instance);
@@ -679,11 +639,13 @@ public class JapeHelper {
             this.vo = vo;
         }
 
+        @NotNull
         public DynamicVO updateVO() throws Exception {
             return JapeHelper.updateVO(instance, this.vo);
         }
 
-        public DynamicVO update(String where, Object... params) throws MGEModelException {
+        @NotNull
+        public DynamicVO update(String where, Object... params) throws Exception {
             return JapeHelper.update(values, instance, where, params);
         }
 
@@ -723,7 +685,7 @@ public class JapeHelper {
         private String toJson(DynamicVO vo) {
             if (vo == null) return null;
             JsonObject root = new JsonObject();
-            Iterator iterator = vo.iterator();
+            Iterator<?> iterator = vo.iterator();
             while (iterator.hasNext()) {
                 VOProperty entry = (VOProperty) iterator.next();
                 String name = entry.getName();
@@ -737,6 +699,5 @@ public class JapeHelper {
             return str.equals(str.toUpperCase());
         }
     }
-
 
 }

@@ -51,7 +51,7 @@ public class ResolveNamedParameter {
         } else if (parameter instanceof Date) {
             return type == ResolveSqlTypes.Database.ORACLE ? getOracleDate((Date) parameter) : getMssqlDate((Date) parameter);
         } else if (parameter instanceof Boolean) {
-            return (Boolean) parameter ? "1" : "0";
+            return (Boolean) parameter ? "'S'" : "'N'";
         } else {
             throw new IllegalArgumentException("Unsupported parameter type: " + parameter.getClass().getName());
         }

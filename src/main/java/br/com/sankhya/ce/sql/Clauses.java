@@ -1,18 +1,15 @@
 package br.com.sankhya.ce.sql;
 
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.stream.Collectors;
 
 public class Clauses {
-
-    public static String toSqlInClause(Iterable<String> array) {
+    public static String toSqlInClause(Iterable<Object> array) {
         StringBuilder sb = new StringBuilder();
         sb.append("(");
 
-        Iterator<String> iterator = array.iterator();
+        Iterator<Object> iterator = array.iterator();
         while (iterator.hasNext()) {
-            sb.append(iterator.next());
+            sb.append(iterator.next().toString());
             if (iterator.hasNext()) {
                 sb.append(",");
             }
@@ -21,4 +18,5 @@ public class Clauses {
         sb.append(")");
         return sb.toString();
     }
+
 }

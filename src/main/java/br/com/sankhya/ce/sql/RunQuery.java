@@ -1,5 +1,9 @@
 package br.com.sankhya.ce.sql;
 
+import br.com.sankhya.ce.sql.enums.SqlCommandType;
+import br.com.sankhya.ce.sql.interfaces.ResultSetConsumer;
+import br.com.sankhya.ce.sql.interfaces.ResultSetPredicate;
+import br.com.sankhya.ce.sql.interfaces.ThrowingFunction;
 import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.sql.NativeSql;
 import br.com.sankhya.modelcore.util.EntityFacadeFactory;
@@ -10,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,52 +35,119 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     private ResultSet resultSet;
     private boolean status;
 
+    /**
+     * Cria uma nova instância de execução SQL.
+     *
+     * @param query SQL a ser executado.
+     */
     public RunQuery(String query) {
         this.query = query;
     }
 
+    /**
+     * Cria uma nova instância com parâmetros posicionais.
+     *
+     * @param query  SQL a ser executado.
+     * @param params Parâmetros posicionais.
+     */
     public RunQuery(String query, Object[] params) {
         this.query = query;
         this.addParameters(params);
     }
 
+    /**
+     * Cria uma nova instância com callback de customização do {@link NativeSql}.
+     *
+     * @param query    SQL a ser executado.
+     * @param callBack Callback para customizar o {@link NativeSql}.
+     */
     public RunQuery(String query, Function<NativeSql, NativeSql> callBack) {
         this.query = query;
         this.callBack = callBack;
     }
 
+
+    /**
+     * Retorna o status da última execução.
+     *
+     * @return true caso a execução tenha sido bem-sucedida.
+     */
     public boolean isOk() {
         return status;
     }
 
+    /**
+     * Define um callback de customização do {@link NativeSql}.
+     *
+     * @param callBack Callback de customização.
+     */
     public void setCallBack(Function<NativeSql, NativeSql> callBack) {
         this.callBack = callBack;
     }
 
+    /**
+     * Adiciona um parâmetro posicional.
+     *
+     * @param value Valor do parâmetro.
+     * @return Instância atual.
+     */
     public RunQuery setParameter(Object value) {
         params.add(value);
         return this;
     }
 
+    /**
+     * Adiciona múltiplos parâmetros posicionais.
+     *
+     * @param values Lista de parâmetros.
+     * @return Instância atual.
+     */
     public RunQuery addParameters(Object[] values) {
         Collections.addAll(params, values);
         return this;
     }
 
+    /**
+     * Adiciona múltiplos parâmetros nomeados.
+     *
+     * @param params Mapa de parâmetros.
+     * @return Instância atual.
+     */
     public RunQuery addParameters(Map<String, Object> params) {
         this.namedParams.putAll(params);
         return this;
     }
 
+    /**
+     * Define um parâmetro nomeado.
+     *
+     * @param name  Nome do parâmetro.
+     * @param value Valor do parâmetro.
+     * @return Instância atual.
+     */
     public RunQuery setParameter(String name, Object value) {
         namedParams.put(name, value);
         return this;
     }
 
+    /**
+     * Retorna o {@link ResultSet} atual.
+     *
+     * @return ResultSet da consulta executada.
+     */
     public ResultSet getResultSet() {
         return resultSet;
     }
 
+    /**
+     * Executa automaticamente o SQL detectando o tipo do comando.
+     * <p>
+     * SELECTs utilizam executeQuery().
+     * DMLs utilizam executeUpdate().
+     *
+     * @return Instância atual.
+     * @throws Exception Caso ocorra erro na execução.
+     */
     public RunQuery execute() throws Exception {
         try {
             this.localSession = jdbcWrapper.getConnection() == null;
@@ -84,7 +156,7 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
                 jdbcWrapper.openSession();
             }
 
-            SqlCommandType type = getSqlCommandType(query);
+            SqlCommandType type = SqlCommandType.getSqlCommandType(query);
             if (canUseExecuteQuery(type)) {
                 resultSet = executeDQL(query);
                 status = true;
@@ -103,9 +175,10 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
 
     /**
      * Executa um comando DML (INSERT, UPDATE, DELETE, etc.).
-     * <p>
-     * Este método é de uso interno e pressupõe que uma sessão JDBC já esteja ativa.
-     * Para uso externo, prefira {@link #execute()}.
+     *
+     * @param query SQL DML.
+     * @return true caso executeUpdate() retorne sucesso.
+     * @throws Exception Caso ocorra erro.
      */
     private boolean executeDML(String query) throws Exception {
         this.sql = new NativeSql(jdbcWrapper);
@@ -116,10 +189,11 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     }
 
     /**
-     * Executa um comando DQL (SELECT, WITH, EXPLAIN, etc.).
-     * <p>
-     * Este método é de uso interno e pressupõe que uma sessão JDBC já esteja ativa.
-     * Para uso externo, prefira {@link #execute()}.
+     * Executa um comando DQL (SELECT).
+     *
+     * @param query SQL SELECT.
+     * @return ResultSet retornado pela consulta.
+     * @throws Exception Caso ocorra erro.
      */
     private ResultSet executeDQL(String query) throws Exception {
         this.sql = new NativeSql(jdbcWrapper);
@@ -130,7 +204,12 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     }
 
     /**
-     * Atalho estático para executar um DML sem precisar gerenciar a instância manualmente.
+     * Executa rapidamente um comando DML.
+     *
+     * @param query  SQL a ser executado.
+     * @param params Parâmetros posicionais.
+     * @return true caso executado com sucesso.
+     * @throws Exception Caso ocorra erro.
      */
     public static boolean execute(String query, Object... params) throws Exception {
         try (RunQuery runQuery = new RunQuery(query, params).execute()) {
@@ -138,10 +217,23 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         }
     }
 
+
+    /**
+     * Verifica se o comando SQL deve utilizar executeQuery().
+     *
+     * @param type Tipo do comando SQL.
+     * @return true para SELECT.
+     */
     public boolean canUseExecuteQuery(SqlCommandType type) {
         return type == SqlCommandType.SELECT;
     }
 
+    /**
+     * Verifica se o comando SQL deve utilizar executeUpdate().
+     *
+     * @param type Tipo do comando SQL.
+     * @return true para comandos DML/DDL.
+     */
     public boolean canUseExecuteUpdate(SqlCommandType type) {
         switch (type) {
             case INSERT:
@@ -157,109 +249,12 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         }
     }
 
-    public enum SqlCommandType {
-        SELECT, INSERT, UPDATE, DELETE, MERGE, CREATE, DROP, ALTER, SHOW, DESCRIBE, EXPLAIN, UNKNOWN
-    }
-
-    public static SqlCommandType getSqlCommandType(String sql) {
-        if (sql == null || sql.trim().isEmpty()) {
-            return SqlCommandType.UNKNOWN;
-        }
-
-        String cleaned = removeLeadingComments(sql).trim().toUpperCase();
-
-        if (cleaned.isEmpty()) {
-            return SqlCommandType.UNKNOWN;
-        }
-
-        String firstWord = cleaned.split("\\s+")[0];
-
-        // WITH pode prefixar INSERT/UPDATE/DELETE — faz look-ahead para o comando real
-        if (firstWord.equals("WITH")) {
-            return resolveWithCommand(cleaned);
-        }
-
-        if (firstWord.equals("EXPLAIN") || firstWord.equals("SHOW") || firstWord.equals("DESCRIBE")) {
-            return SqlCommandType.SELECT;
-        }
-
-        try {
-            return SqlCommandType.valueOf(firstWord);
-        } catch (IllegalArgumentException e) {
-            return SqlCommandType.UNKNOWN;
-        }
-    }
 
     /**
-     * Faz look-ahead no corpo de um WITH para determinar o comando real
-     * (SELECT, INSERT, UPDATE ou DELETE).
-     */
-    private static SqlCommandType resolveWithCommand(String upperSql) {
-        // Procura o primeiro SELECT, INSERT, UPDATE ou DELETE fora de parênteses
-        int depth = 0;
-        String[] tokens = upperSql.split("\\s+");
-        for (String token : tokens) {
-            depth += countChar(token, '(') - countChar(token, ')');
-            if (depth == 0) {
-                String bare = token.replaceAll("[^A-Z]", "");
-                switch (bare) {
-                    case "SELECT":
-                        return SqlCommandType.SELECT;
-                    case "INSERT":
-                        return SqlCommandType.INSERT;
-                    case "UPDATE":
-                        return SqlCommandType.UPDATE;
-                    case "DELETE":
-                        return SqlCommandType.DELETE;
-                }
-            }
-        }
-        // Se não achou nada conclusivo, assume SELECT (comportamento mais seguro)
-        return SqlCommandType.SELECT;
-    }
-
-    private static int countChar(String s, char c) {
-        int count = 0;
-        for (int i = 0; i < s.length(); i++) {
-            if (s.charAt(i) == c) count++;
-        }
-        return count;
-    }
-
-    /**
-     * Remove comentários de linha (--) e de bloco (/* *\/) do início do SQL,
-     * alternando entre os dois tipos até não restar nenhum.
-     */
-    private static String removeLeadingComments(String sql) {
-        String result = sql.trim();
-
-        boolean removed = true;
-        while (removed) {
-            removed = false;
-
-            while (result.startsWith("--")) {
-                int newLine = result.indexOf('\n');
-                if (newLine == -1) return "";
-                result = result.substring(newLine + 1).trim();
-                removed = true;
-            }
-
-            while (result.startsWith("/*")) {
-                int endComment = result.indexOf("*/");
-                if (endComment == -1) return "";
-                result = result.substring(endComment + 2).trim();
-                removed = true;
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * Converte o ResultSet atual em uma lista de mapas case-insensitive.
-     * Só deve ser chamado após um SELECT bem-sucedido.
+     * Converte todo o ResultSet em uma lista de mapas case-insensitive.
      *
-     * @throws IllegalStateException se não houver ResultSet disponível.
+     * @return Lista contendo todas as linhas.
+     * @throws SQLException Caso ocorra erro.
      */
     public List<Map<String, Object>> toList() throws SQLException {
         if (resultSet == null) {
@@ -267,34 +262,107 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         }
         List<Map<String, Object>> results = new ArrayList<>();
         forEach(row -> {
-            results.add(row);
-            return RowConsumer.Action.CONTINUE;
+            try {
+                results.add(toMap(row));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         });
         return results;
     }
 
+    /**
+     * Realiza o bind de parâmetros nomeados e posicionais.
+     *
+     * @param ns Instância NativeSql.
+     */
     private void bindParameters(NativeSql ns) {
         this.namedParams.forEach(ns::setNamedParameter);
         this.params.forEach(ns::addParameter);
     }
 
-    public void forEach(RowConsumer<Map<String, Object>> action) throws SQLException {
-        if (resultSet == null) {
-            throw new IllegalStateException("forEach() só pode ser chamado após um SELECT bem-sucedido.");
-        }
-        while (resultSet.next()) {
-            Map<String, Object> row = toMap(resultSet);
-            RowConsumer.Action result = action.accept(row);
-            if (result == RowConsumer.Action.CONTINUE) continue;
-            if (result == RowConsumer.Action.BREAK) break;
+
+    /**
+     * Executa uma query SELECT rapidamente.
+     *
+     * @param sql    SQL SELECT.
+     * @param params Parâmetros posicionais.
+     * @return Instância pronta para iteração.
+     * @throws Exception Caso ocorra erro.
+     */
+    @SuppressWarnings("all")
+    public static RunQuery query(String sql, Object... params) throws Exception {
+        return new RunQuery(sql).addParameters(params).execute();
+    }
+
+    /**
+     * Itera sobre todas as linhas do ResultSet.
+     *
+     * @param action Callback executado para cada linha.
+     * @throws Exception Caso ocorra erro.
+     */
+    public void iterate(ResultSetConsumer action) throws Exception {
+        try (RunQuery query = this) {
+            for (ResultSet rs : query) {
+                action.accept(rs);
+            }
         }
     }
 
-    @FunctionalInterface
-    public interface ThrowingFunction<T, R> {
-        R apply(T t) throws Exception;
+    /**
+     * Itera até que o callback retorne false.
+     *
+     * @param action Callback condicional.
+     * @throws Exception Caso ocorra erro.
+     */
+    public void iterateUntil(ResultSetPredicate action) throws Exception {
+        try (RunQuery query = this) {
+            for (ResultSet rs : query) {
+                if (!action.test(rs)) {
+                    break;
+                }
+            }
+        }
     }
 
+    /**
+     * Executa uma query e consome os resultados automaticamente.
+     *
+     * @param sql    SQL SELECT.
+     * @param action Callback executado para cada linha.
+     * @param params Parâmetros posicionais.
+     * @throws Exception Caso ocorra erro.
+     */
+    public static void query(String sql, Consumer<ResultSet> action, Object... params) throws Exception {
+        try (RunQuery runQuery = new RunQuery(sql).addParameters(params).execute()) {
+            runQuery.forEach(action);
+        }
+    }
+
+
+    /**
+     * Executa uma query e consome os resultados automaticamente.
+     *
+     * @param sql    SQL SELECT.
+     * @param params Parâmetros posicionais.
+     * @param action Callback executado para cada linha.
+     * @throws Exception Caso ocorra erro.
+     */
+    public static void query(String sql, Object[] params, Consumer<ResultSet> action) throws Exception {
+        try (RunQuery runQuery = new RunQuery(sql).addParameters(params).execute()) {
+            runQuery.forEach(action);
+        }
+    }
+
+
+    /**
+     * Retorna o primeiro resultado da consulta.
+     *
+     * @param action Conversor do ResultSet.
+     * @param <T>    Tipo de retorno.
+     * @return Primeiro valor encontrado.
+     * @throws Exception Caso ocorra erro.
+     */
     public <T> Optional<T> getFirst(ThrowingFunction<ResultSet, T> action) throws Exception {
         if (resultSet == null) return Optional.empty();
         if (resultSet.next()) {
@@ -304,8 +372,15 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     }
 
     /**
-     * Busca um único valor de uma tabela com condição WHERE.
-     * O tipo de retorno deve ser especificado pelo caller via cast ou inferência.
+     * Busca um único valor em uma tabela.
+     *
+     * @param table  Nome da tabela.
+     * @param field  Campo desejado.
+     * @param where  Condição WHERE.
+     * @param params Parâmetros posicionais.
+     * @param <T>    Tipo de retorno.
+     * @return Valor encontrado.
+     * @throws Exception Caso ocorra erro.
      */
     @SuppressWarnings("unchecked")
     public static <T> Optional<T> getFirst(String table, String field, String where, Object... params) throws Exception {
@@ -315,16 +390,37 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         }
     }
 
-    public interface RowConsumer<T> {
-        enum Action {CONTINUE, BREAK}
-
-        Action accept(T value) throws SQLException;
+    /**
+     * Busca um único valor em uma tabela.
+     *
+     * @param sql    Nome da tabela.
+     * @param action Função a ser executada com o resultado.
+     * @param <T>    Tipo de retorno.
+     * @return Valor encontrado.
+     * @throws Exception Caso ocorra erro.
+     */
+    public static <T> Optional<T> getFirst(String sql, ThrowingFunction<ResultSet, T> action) throws Exception {
+        try (RunQuery runQuery = new RunQuery(sql).execute()) {
+            return runQuery.getFirst(action);
+        }
     }
 
+
+    /**
+     * Retorna o metadata do ResultSet atual.
+     *
+     * @return Metadata da consulta.
+     * @throws SQLException Caso ocorra erro.
+     */
     public ResultSetMetaData getMetaData() throws SQLException {
         return resultSet != null ? resultSet.getMetaData() : null;
     }
 
+    /**
+     * Fecha todos os recursos JDBC utilizados.
+     *
+     * @throws SQLException Caso ocorra erro.
+     */
     @Override
     public void close() throws SQLException {
         NativeSql.releaseResources(this.sql);
@@ -333,14 +429,14 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
             JdbcUtils.closeResultSet(this.resultSet);
         }
         if (localSession) {
-            log.info(String.format("%s local session closed", jdbcWrapper));
             JdbcWrapper.closeSession(jdbcWrapper);
         }
     }
 
     /**
-     * Itera sobre as linhas do ResultSet como mapas case-insensitive.
-     * Só disponível após um SELECT bem-sucedido.
+     * Retorna um iterator para percorrer o ResultSet.
+     *
+     * @return Iterator do ResultSet.
      */
     @Override
     public @NotNull Iterator<ResultSet> iterator() {
@@ -377,6 +473,13 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
         };
     }
 
+    /**
+     * Converte uma linha do ResultSet em mapa case-insensitive.
+     *
+     * @param resultSet Linha atual do ResultSet.
+     * @return Mapa contendo colunas e valores.
+     * @throws SQLException Caso ocorra erro.
+     */
     public static Map<String, Object> toMap(ResultSet resultSet) throws SQLException {
         ResultSetMetaData rsmd = resultSet.getMetaData();
         int cols = rsmd.getColumnCount();

@@ -97,7 +97,7 @@ public class ConvertHelper {
     /**
      * Retorna a data atual no formato dd/mm/yyyy
      *
-     * @return [Pair<Timestamp, String>]
+     * @return {@code Pair<Timestamp, String>}
      * @author Luis Ricardo Alves Santos
      */
     public static Pair<Timestamp, String> dateNow() {
