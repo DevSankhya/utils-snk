@@ -144,6 +144,8 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
      * <p>
      * SELECTs utilizam executeQuery().
      * DMLs utilizam executeUpdate().
+     * <p>
+     * Obs: Recomendado o uso de  try-with-resources
      *
      * @return Instância atual.
      * @throws Exception Caso ocorra erro na execução.
@@ -157,13 +159,13 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
             }
 
             SqlCommandType type = SqlCommandType.getSqlCommandType(query);
-            if (canUseExecuteQuery(type)) {
-                resultSet = executeDQL(query);
+            if (type.isQuery()) {
+                resultSet = executeRead(query);
                 status = true;
-            } else if (canUseExecuteUpdate(type)) {
-                status = executeDML(query);
+            } else if (type.isWriteOnly()) {
+                status = executeWrite(query);
             } else {
-                throw new IllegalArgumentException("Unknown SQL command: " + query);
+                throw new IllegalArgumentException("Unknown SQL command: " + type);
             }
             return this;
         } catch (Exception e) {
@@ -180,7 +182,7 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
      * @return true caso executeUpdate() retorne sucesso.
      * @throws Exception Caso ocorra erro.
      */
-    private boolean executeDML(String query) throws Exception {
+    private boolean executeWrite(String query) throws Exception {
         this.sql = new NativeSql(jdbcWrapper);
         this.sql.appendSql(query);
         this.sql = callBack.apply(this.sql);
@@ -195,7 +197,7 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
      * @return ResultSet retornado pela consulta.
      * @throws Exception Caso ocorra erro.
      */
-    private ResultSet executeDQL(String query) throws Exception {
+    private ResultSet executeRead(String query) throws Exception {
         this.sql = new NativeSql(jdbcWrapper);
         this.sql.appendSql(query);
         this.sql = callBack.apply(this.sql);
@@ -214,38 +216,6 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
     public static boolean execute(String query, Object... params) throws Exception {
         try (RunQuery runQuery = new RunQuery(query, params).execute()) {
             return runQuery.isOk();
-        }
-    }
-
-
-    /**
-     * Verifica se o comando SQL deve utilizar executeQuery().
-     *
-     * @param type Tipo do comando SQL.
-     * @return true para SELECT.
-     */
-    public boolean canUseExecuteQuery(SqlCommandType type) {
-        return type == SqlCommandType.SELECT;
-    }
-
-    /**
-     * Verifica se o comando SQL deve utilizar executeUpdate().
-     *
-     * @param type Tipo do comando SQL.
-     * @return true para comandos DML/DDL.
-     */
-    public boolean canUseExecuteUpdate(SqlCommandType type) {
-        switch (type) {
-            case INSERT:
-            case UPDATE:
-            case DELETE:
-            case MERGE:
-            case CREATE:
-            case DROP:
-            case ALTER:
-                return true;
-            default:
-                return false;
         }
     }
 
@@ -423,10 +393,13 @@ public class RunQuery implements Iterable<ResultSet>, AutoCloseable {
      */
     @Override
     public void close() throws SQLException {
-        NativeSql.releaseResources(this.sql);
+
 
         if (resultSet != null && !resultSet.isClosed()) {
             JdbcUtils.closeResultSet(this.resultSet);
+        }
+        if (this.sql != null) {
+            NativeSql.releaseResources(this.sql);
         }
         if (localSession) {
             JdbcWrapper.closeSession(jdbcWrapper);
