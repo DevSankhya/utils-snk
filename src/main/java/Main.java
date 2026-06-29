@@ -1,28 +1,83 @@
 import br.com.sankhya.ce.templating.EvaluteHtml;
-import br.com.sankhya.ce.tuples.Pair;
 
-import java.math.BigDecimal;
-import java.util.*;
+import java.util.List;
 
 public class Main {
 
     public static void main(String[] args) {
+
         EvaluteHtml html = new EvaluteHtml();
 
-        HashMap<BigDecimal, ArrayList<String>> concluidos = new HashMap<>();
+        html.addVar("chave", "vRfe_9A87EFC9304A55768CBD6229A668AE2A");
+        String eval = html.eval("/teste2.html");
 
-        concluidos.put(BigDecimal.ZERO, new ArrayList<>(Arrays.asList("2304987304927498", "4564835096845069")));
-        concluidos.put(BigDecimal.ONE, new ArrayList<>(Arrays.asList("3423809809234", "20546949845809")));
-
-
-        HashMap<BigDecimal, String> erros = new HashMap<>();
-        erros.put(BigDecimal.ZERO, "Erro de teste");
-        erros.put(BigDecimal.ONE, "Erro de teste");
-
-
-        String eval = html.eval("/teste.html", Pair.of("concluidos", concluidos), Pair.of("erros", erros));
         System.out.println(eval);
     }
 
+    public class Root {
+        private List<Root2> root;
+
+        public Root(List<Root2> root) {
+            this.root = root;
+        }
+
+        public List<Root2> getRoot() {
+            return this.root;
+        }
+
+        public void setRoot(List<Root2> root) {
+            this.root = root;
+        }
+
+    }
+
+    public class Root2 {
+        private Long userId;
+        private Long id;
+        private String title;
+        private String body;
+
+        public Root2(Long userId, Long id, String title, String body) {
+            this.userId = userId;
+            this.id = id;
+            this.title = title;
+            this.body = body;
+        }
+
+        public Long getUserId() {
+            return this.userId;
+        }
+
+        public Long getId() {
+            return this.id;
+        }
+
+        public String getTitle() {
+            return this.title;
+        }
+
+        public String getBody() {
+            return this.body;
+        }
+
+        public void setUserId(Long userId) {
+            this.userId = userId;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public void setBody(String body) {
+            this.body = body;
+        }
+    }
+
 }
+
+
 

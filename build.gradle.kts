@@ -63,7 +63,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.github.DevSankhya:snk-wrapper:1.1.4")
+    implementation("com.github.DevSankhya:snk-wrapper:1.1.4")
 
     // Status HTTP / Apoio as Servlets
     implementation("com.squareup.okhttp3:okhttp:3.9.0")

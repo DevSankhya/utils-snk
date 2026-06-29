@@ -1,35 +1,53 @@
 package br.com.sankhya.ce.templating;
 
 import br.com.sankhya.ce.tuples.Pair;
+import com.google.gson.Gson;
 
-import javax.script.*;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.io.InputStream;
 
 public class EvaluteHtml {
 
-    final String regexScriptTag = "<script (@Server)(?:\\s+(?:[\\s \"=A-Za-z0-9_@.\\/#&+-]*\\s*)?>|>)((?:.|\\n)*?)<\\/script>$";
-    final Pattern patternScriptTag = Pattern.compile(regexScriptTag, Pattern.MULTILINE);
-    final Pattern patternVar = Pattern.compile("<%=((?:.|\\n)*?)%>$", Pattern.MULTILINE);
+    private static final Gson GSON = new Gson();
+
+    private static final Pattern SCRIPT_PATTERN =
+        Pattern.compile(
+            "<script\\s+@Server(?:\\s+[^>]*)?>(.*?)</script>",
+            Pattern.DOTALL);
+
+    private static final Pattern LITERAL_PATTERN =
+        Pattern.compile("<%=([\\s\\S]*?)%>");
+
+    private static final Pattern VARIABLE_PATTERN =
+        Pattern.compile("<%-\\s*(.*?)\\s*%>");
+
     private final ScriptEngine engine = new ScriptEngineManager().getEngineByName("js");
-    private final String globalVaribleName = "$this";
+    private static final String GLOBAL_VARIABLE_NAME = "$this";
     private final String engineName = engine.getFactory().getEngineName();
 
     public EvaluteHtml() {
-        engine.put(globalVaribleName, this);
+        engine.put(GLOBAL_VARIABLE_NAME, this);
 
         this.evalJsVoid("/templating/pollyfill.js");
     }
+
+    public void addVar(String varName, Object value) {
+        engine.put(varName, value);
+    }
+
 
     private String getContentFromResource(Class<?> baseClass, String resourcePath) throws Exception {
         InputStream stream = baseClass.getResourceAsStream(resourcePath);
@@ -46,74 +64,119 @@ public class EvaluteHtml {
         return getContentFromResource(Class.forName(Thread.currentThread().getStackTrace()[2].getClassName()), resourcePath);
     }
 
-    private String getSource(String str) {
+    private String getSource(String source) {
+
+        if (!source.startsWith("/"))
+            return source;
+
         try {
-            Paths.get(str); // Check if is a valid path
-            return loadResource(str);
-        } catch (Exception ex) {
-            return str;
+            return loadResource(source);
+        } catch (Exception e) {
+            return source;
         }
     }
 
     private Optional<String> evalute(String source) {
         String htmlRet = getSource(source);
 
+        htmlRet = replaceExpressions(htmlRet, SCRIPT_PATTERN);
+        htmlRet = replaceExpressions(htmlRet, LITERAL_PATTERN);
+        htmlRet = replaceExpressions(htmlRet, VARIABLE_PATTERN, GSON::toJson);
 
-        final Matcher matcher = patternScriptTag.matcher(htmlRet);
-
-        while (matcher.find()) {
-            String type = matcher.group(1);
-            String script = matcher.group(2);
-
-            if ("@Server".equals(type)) { // Processa o script, mas não retorna nada
-                this.evalJsVoid(script);
-                htmlRet = htmlRet.replace(matcher.group(0), "");
-            }
-        }
-
-
-        final Matcher matcherVar = patternVar.matcher(htmlRet);
-
-        while (matcherVar.find()) {
-            String script = matcherVar.group(1);
-            try {
-                Object res = engine.eval(script);
-
-                if (res == null) res = "null";
-
-                htmlRet = htmlRet.replace(matcherVar.group(0), res.toString());
-            } catch (ScriptException e) {
-                throw new RuntimeException(e);
-            }
-        }
         return Optional.of(htmlRet.trim());
     }
 
-    @SuppressWarnings("unchecked")
     private <T> T evaluteJs(String js) {
         if (js == null) return null;
-        try {
-            return (T) engine.eval(js);
-        } catch (ScriptException e) {
-            throw new RuntimeException(e);
-        }
+        return executeScript(js);
     }
 
     @SafeVarargs
     public final String eval(String html, Pair<String, Object>... args) {
-        for (Pair<String, Object> pair : args) {
-            String name = pair.getLeft();
-            Object value = toJsValue(name, pair.getRight());
-            engine.put(name, value);
-        }
 
-        engine.put(globalVaribleName, this);
+        bindVariables(args);
+
+        engine.put(GLOBAL_VARIABLE_NAME, this);
         Optional<String> evalute = evalute(html);
-        return evalute.map(s -> s.replace("\n", " ")).orElse("");
+        return evalute.orElse("");
 
     }
 
-    private Object toJsValue(String name, Object value) {
+    /**
+     * @param js   Source of js code(Can be plain or a path to a file)
+     * @param args Arguments to be passed to the js code
+     * @return The result of the js code
+     */
+    @SafeVarargs
+    public final <T> T evalJs(String js, Pair<String, Object>... args) {
+
+        js = getSource(js);
+
+        bindVariables(args);
+
+        engine.put(GLOBAL_VARIABLE_NAME, this);
+
+        return evaluteJs(js);
+    }
+
+    /**
+     * @param js   Source of js code(Can be plain or a path to a file)
+     * @param args Arguments to be passed to the js code
+     */
+    @SafeVarargs
+    public final void evalJsVoid(String js, Pair<String, Object>... args) {
+        js = getSource(js);
+
+        bindVariables(args);
+
+        engine.put(GLOBAL_VARIABLE_NAME, this);
+
+        evaluteJs(js);
+    }
+
+
+    private String replaceExpressions(String html,
+                                      Pattern pattern) {
+        return replaceExpressions(html, pattern, Object::toString);
+    }
+
+    private String replaceExpressions(String html,
+                                      Pattern pattern, Function<Object, String> lambda) {
+
+        Matcher matcher = pattern.matcher(html);
+
+        StringBuffer sb = new StringBuffer();
+
+        while (matcher.find()) {
+
+            Object value = executeScript(matcher.group(1));
+
+            matcher.appendReplacement(
+                sb,
+                Matcher.quoteReplacement(
+                    lambda.apply(value)
+                )
+            );
+        }
+
+        matcher.appendTail(sb);
+
+        return sb.toString();
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private <T> T executeScript(String script) {
+
+        try {
+            return (T) engine.eval(script);
+        } catch (ScriptException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private Object convert(String name, Object value) {
         try {
             if (value == null) {
                 return null;
@@ -148,44 +211,14 @@ public class EvaluteHtml {
         }
     }
 
-    /**
-     * @param js   Source of js code(Can be plain or a path to a file)
-     * @param args Arguments to be passed to the js code
-     * @return The result of the js code
-     */
-    @SafeVarargs
-    public final <T> T evalJs(String js, Pair<String, Object>... args) {
-
-        js = getSource(js);
-
+    private void bindVariables(Pair<String, Object>[] args) {
         for (Pair<String, Object> pair : args) {
-            String name = pair.getLeft();
-            Object value = toJsValue(name, pair.getRight());
-            engine.put(name, value);
+            engine.put(pair.getLeft(), convert(pair.getLeft(), pair.getRight()));
         }
-        engine.put(globalVaribleName, this);
 
-        return evaluteJs(js);
+        engine.put(GLOBAL_VARIABLE_NAME, this);
     }
 
-    /**
-     * @param js   Source of js code(Can be plain or a path to a file)
-     * @param args Arguments to be passed to the js code
-     */
-    @SafeVarargs
-    public final void evalJsVoid(String js, Pair<String, Object>... args) {
-
-        js = getSource(js);
-
-        for (Pair<String, Object> pair : args) {
-            String name = pair.getLeft();
-            Object value = toJsValue(name, pair.getRight());
-            engine.put(name, value);
-        }
-        engine.put(globalVaribleName, this);
-
-        evaluteJs(js);
-    }
 
     public String getEngineName() {
         return engineName;

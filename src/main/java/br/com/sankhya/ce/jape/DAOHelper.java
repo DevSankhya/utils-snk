@@ -4,7 +4,6 @@ import br.com.sankhya.ce.sql.ResolveSqlTypes;
 import br.com.sankhya.ce.sql.RunQuery;
 import br.com.sankhya.jape.EntityFacade;
 import br.com.sankhya.jape.bmp.PersistentLocalEntity;
-import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.jape.dao.EntityDAO;
 import br.com.sankhya.jape.dao.JdbcWrapper;
 import br.com.sankhya.jape.vo.DynamicVO;
@@ -22,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@SuppressWarnings("unused")
 public final class DAOHelper {
 
     private static final Logger log = Logger.getLogger(DAOHelper.class.getName());
@@ -47,26 +45,58 @@ public final class DAOHelper {
 
     private static <T> T withDao(String instance, DaoCallback<T> callback) throws MGEModelException {
 
-        JapeSession.SessionHandle hnd = null;
-
-        try {
-
-            hnd = JapeSession.open();
+        Result<T> result = Jape.withSession(() -> {
 
             JapeWrapper dao = getDao(instance);
 
             return callback.execute(dao);
+        });
 
-        } catch (Exception e) {
+        if (result.isError()) {
+            Exception cause = result.getExceptionOrNull();
 
-            log.log(Level.SEVERE, "Erro na entidade: " + instance, e);
+            log.log(
+                Level.SEVERE,
+                "Erro na entidade: " + instance,
+                cause
+            );
 
-            throw new MGEModelException("Erro na entidade '" + instance + "': " + e.getMessage());
-
-        } finally {
-
-            JapeSession.close(hnd);
+            throw new MGEModelException(
+                "Erro na entidade '" + instance + "'",
+                cause
+            );
         }
+
+        return result.getOrNull();
+    }
+
+    private static <T> T withTransaction(String instance, DaoCallback<T> callback)
+        throws MGEModelException {
+
+        Result<T> result = Jape.secureTransaction(() -> {
+
+            JapeWrapper dao = getDao(instance);
+
+            return callback.execute(dao);
+        });
+
+        if (result.isError()) {
+
+            Exception cause = result.getExceptionOrNull();
+
+            log.log(
+                Level.SEVERE,
+                "Erro na entidade: " + instance,
+                cause
+            );
+
+            throw new MGEModelException(
+                "Erro na entidade '" + instance + "'",
+                cause
+            );
+        }
+
+        return result.getOrNull();
     }
 
     // =========================================================
@@ -114,7 +144,7 @@ public final class DAOHelper {
 
     public static DynamicVO create(String instance, Map<String, ?> values) throws MGEModelException {
 
-        return withDao(instance, dao -> {
+        return withTransaction(instance, dao -> {
 
             FluidCreateVO create = dao.create();
 
@@ -130,7 +160,7 @@ public final class DAOHelper {
 
     public static DynamicVO update(String instance, DynamicVO vo, Map<String, ?> values) throws MGEModelException {
 
-        return withDao(instance, dao -> {
+        return withTransaction(instance, dao -> {
 
             FluidUpdateVO update = dao.prepareToUpdate(vo);
 
@@ -146,7 +176,7 @@ public final class DAOHelper {
 
         String resolvedWhere = resolveWhere(where, params);
 
-        return withDao(instance, dao -> {
+        return withTransaction(instance, dao -> {
 
             DynamicVO vo = dao.findOne(resolvedWhere);
 
@@ -169,7 +199,7 @@ public final class DAOHelper {
 
         String resolvedWhere = resolveWhere(where, params);
 
-        return withDao(instance, dao -> {
+        return withTransaction(instance, dao -> {
 
             Collection<DynamicVO> records = dao.find(resolvedWhere);
 
@@ -195,15 +225,14 @@ public final class DAOHelper {
     // =========================================================
 
     public static boolean delete(String instance, DynamicVO vo) throws MGEModelException {
-
-        return withDao(instance, dao -> dao.delete(vo.getPrimaryKey()));
+        return withTransaction(instance, dao -> dao.delete(vo.getPrimaryKey()));
     }
 
     public static boolean delete(String instance, String where, Object... params) throws MGEModelException {
 
         String resolvedWhere = resolveWhere(where, params);
 
-        return withDao(instance, dao -> {
+        return withTransaction(instance, dao -> {
 
             DynamicVO vo = dao.findOne(resolvedWhere);
 
@@ -219,21 +248,7 @@ public final class DAOHelper {
 
         String resolvedWhere = resolveWhere(where, params);
 
-        return withDao(instance, dao -> {
-
-            Collection<DynamicVO> records = dao.find(resolvedWhere);
-
-            int deleted = 0;
-
-            for (DynamicVO vo : records) {
-
-                if (dao.delete(vo.getPrimaryKey())) {
-                    deleted++;
-                }
-            }
-
-            return deleted;
-        });
+        return withTransaction(instance, dao -> dao.deleteByCriteria(where, params));
     }
 
     // =========================================================
@@ -241,16 +256,16 @@ public final class DAOHelper {
     // =========================================================
 
     public static DynamicVO save(String instance, DynamicVO vo) throws Exception {
+        return withTransaction(instance, dao -> {
+            EntityFacade facade = EntityFacadeFactory.getDWFFacade();
 
-        EntityFacade facade = EntityFacadeFactory.getDWFFacade();
+            PersistentLocalEntity entity = facade.saveEntity(instance, (EntityVO) vo);
 
-        PersistentLocalEntity entity = facade.saveEntity(instance, (EntityVO) vo);
-
-        return (DynamicVO) entity.getValueObject();
+            return (DynamicVO) entity.getValueObject();
+        });
     }
 
     public static DynamicVO save(DynamicVO vo) throws Exception {
-
         return save(getEntity(vo), vo);
     }
 
