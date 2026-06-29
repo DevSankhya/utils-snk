@@ -1,0 +1,17 @@
+<script @Server>
+  var count = 0;
+  var okValues = Object.values(concluidos).flat();
+  var errosValues = Object.values(erros);
+
+  function wrapInCodeTag(text) {
+    return "<code>" + text + "</code>";
+  }
+</script>
+
+<%= "Total de Processados: "+(okValues.length + errosValues.length) %>
+<br />
+<%= okValues.length > 0? "Concluidos: "+wrapInCodeTag(okValues.join(",")) : ""%>
+<br />
+<%= errosValues.length> 0? "Erros: "+wrapInCodeTag(errosValues.join(",")) : ""
+%>
+<br />
