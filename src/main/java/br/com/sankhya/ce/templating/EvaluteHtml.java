@@ -98,7 +98,7 @@ public class EvaluteHtml {
 
         engine.put(GLOBAL_VARIABLE_NAME, this);
         Optional<String> evalute = evalute(html);
-        return evalute.orElse("");
+        return evalute.map(s -> s.replace("\n", " ")).orElse("");
 
     }
 

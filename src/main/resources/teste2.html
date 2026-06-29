@@ -1,13 +1,7 @@
-<script @Server>
-    function getUrl(base) {
-        var url = base+"/mge/visualizadorArquivos.mge?chaveArquivo="+chave;
-       return url
-    }
-</script>
 <script>
     function openReport() {
         const a = document.createElement("a");
-        a.href = <%= getUrl %>;
+        a.href = `${window.origin}/mge/visualizadorArquivos.mge?chaveArquivo=${<%- chave %>}`;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
         a.click();

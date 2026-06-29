@@ -82,6 +82,10 @@ dependencies {
 }
 
 dependencies {
+    testImplementation("com.github.DevSankhya:snk-wrapper:1.1.4")
+
+    testImplementation("com.google.code.gson", "gson", "2.1")
+
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
