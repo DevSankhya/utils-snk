@@ -1,5 +1,6 @@
 package br.com.sankhya.ce.jape;
 
+import br.com.sankhya.ce.types.Unit;
 import br.com.sankhya.jape.core.JapeSession;
 import br.com.sankhya.modelcore.auth.AuthenticationInfo;
 import br.com.sankhya.modelcore.util.SPBeanUtils;
@@ -19,6 +20,12 @@ public final class Jape {
         T get() throws Exception;
     }
 
+    @FunctionalInterface
+    public interface ThrowingConsumer {
+        void apply() throws Exception;
+    }
+
+
     public static <T> Result<T> secureTransaction(ThrowingSupplier<T> block) {
         try {
             T result;
@@ -35,6 +42,13 @@ public final class Jape {
         }
     }
 
+    public static Result<Unit> secureTransaction(ThrowingConsumer block) {
+        return secureTransaction(() -> {
+            block.apply();
+            return Unit.INSTANCE;
+        });
+    }
+
     public static <T> Result<T> withSession(ThrowingSupplier<T> block) {
         try {
             T result;
@@ -49,6 +63,13 @@ public final class Jape {
         } catch (Exception e) {
             return Result.error(e);
         }
+    }
+
+    public static Result<Unit> withSession(ThrowingConsumer block) {
+        return withSession(() -> {
+            block.apply();
+            return Unit.INSTANCE;
+        });
     }
 
     private static <T> T execEnsuringTXWithResult(ThrowingSupplier<T> block) throws Exception {
